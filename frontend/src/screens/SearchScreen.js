@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,75 +6,69 @@ import {
   TouchableOpacity,
   Keyboard,
   Dimensions,
+  Animated,
+  Platform,
 } from 'react-native';
 import { Text, Searchbar, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
+import * as Haptics from 'expo-haptics';
 import { stockAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
 const screenWidth = Dimensions.get('window').width;
 
-export default function SearchScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const navigation = useNavigation();
-  const theme = useTheme();
+// Search Result Item Component
+const SearchResultItem = React.memo(({ item, index, theme, handleStockPress, generateChartData }) => {
+  const isPositive = item.changePercent >= 0;
+  const chartData = useMemo(() => generateChartData(isPositive), [isPositive, generateChartData]);
+  const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
+  const itemAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery.trim().length > 0) {
-        performSearch();
-      } else {
-        setResults([]);
-      }
-    }, 500);
+    Animated.timing(itemAnim, {
+      toValue: 1,
+      duration: 300,
+      delay: index * 30,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  const translateX = itemAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 0],
+  });
 
-  const performSearch = async () => {
-    setLoading(true);
-    try {
-      const data = await stockAPI.searchStocks(searchQuery);
-      setResults(data);
-    } catch (error) {
-      console.error('Search error:', error);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const opacity = itemAnim;
 
-  const handleStockPress = (symbol) => {
-    Keyboard.dismiss();
-    navigation.navigate('StockDetail', { symbol });
-  };
-
-  const generateChartData = (isPositive) => {
-    const data = [];
-    const baseValue = 100;
-    for (let i = 0; i < 10; i++) {
-      const change = isPositive 
-        ? Math.random() * 5 
-        : -Math.random() * 5;
-      data.push(baseValue + change + (i * (isPositive ? 1 : -1)));
-    }
-    return data;
-  };
-
-  const renderStockItem = ({ item }) => {
-    const isPositive = item.changePercent >= 0;
-    const chartData = generateChartData(isPositive);
-    const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
-
-    return (
+  return (
+    <Animated.View
+      style={{
+        opacity,
+        transform: [{ translateX }],
+      }}
+    >
       <TouchableOpacity 
         onPress={() => handleStockPress(item.symbol)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={[styles.stockCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={[
+          styles.stockCard,
+          {
+            backgroundColor: theme.colors.surface,
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+              },
+              android: {
+                elevation: 3,
+              },
+            }),
+          },
+        ]}>
           <View style={styles.stockRow}>
             <View style={styles.stockInfo}>
               <Text style={[styles.stockSymbol, { color: theme.colors.text }]}>
@@ -160,8 +154,87 @@ export default function SearchScreen() {
           </View>
         </View>
       </TouchableOpacity>
-    );
+    </Animated.View>
+  );
+});
+
+export default function SearchScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const navigation = useNavigation();
+  const theme = useTheme();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const searchBarRef = useRef(null);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim().length > 0) {
+        performSearch();
+      } else {
+        setResults([]);
+        fadeAnim.setValue(0);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (results.length > 0) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [results]);
+
+  const performSearch = async () => {
+    setLoading(true);
+    try {
+      const data = await stockAPI.searchStocks(searchQuery);
+      setResults(data);
+      if (Platform.OS !== 'web' && data.length > 0) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleStockPress = useCallback((symbol) => {
+    Keyboard.dismiss();
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    navigation.navigate('StockDetail', { symbol });
+  }, [navigation]);
+
+  const generateChartData = (isPositive) => {
+    const data = [];
+    const baseValue = 100;
+    for (let i = 0; i < 10; i++) {
+      const change = isPositive 
+        ? Math.random() * 5 
+        : -Math.random() * 5;
+      data.push(baseValue + change + (i * (isPositive ? 1 : -1)));
+    }
+    return data;
+  };
+
+  const renderStockItem = useCallback(({ item, index }) => (
+    <SearchResultItem
+      item={item}
+      index={index}
+      theme={theme}
+      handleStockPress={handleStockPress}
+      generateChartData={generateChartData}
+    />
+  ), [theme, handleStockPress, generateChartData]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -214,12 +287,24 @@ export default function SearchScreen() {
       )}
 
       {!loading && results.length > 0 && (
-        <FlatList
-          data={results}
-          renderItem={renderStockItem}
-          keyExtractor={(item) => item.symbol}
-          contentContainerStyle={styles.listContent}
-        />
+        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          <FlatList
+            data={results}
+            renderItem={renderStockItem}
+            keyExtractor={(item) => item.symbol}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            initialNumToRender={8}
+            getItemLayout={(data, index) => ({
+              length: 88,
+              offset: 88 * index,
+              index,
+            })}
+          />
+        </Animated.View>
       )}
     </View>
   );
@@ -268,7 +353,9 @@ const styles = StyleSheet.create({
   stockCard: {
     padding: 16,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   stockRow: {
     flexDirection: 'row',

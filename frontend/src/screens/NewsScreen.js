@@ -1,70 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Animated,
+  Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
+import * as Haptics from 'expo-haptics';
 import { newsAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
-export default function NewsScreen() {
-  const [news, setNews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const theme = useTheme();
+// News Card Component
+const NewsCard = React.memo(({ article, index, theme }) => {
+  const cardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchNews();
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 400,
+      delay: index * 50,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const fetchNews = async () => {
-    try {
-      const data = await newsAPI.getNewsFeed();
-      setNews(data);
-    } catch (error) {
-      console.error('Error fetching news:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchNews();
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>
-          Loading news...
-        </Text>
-      </View>
-    );
-  }
+  const translateY = cardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 0],
+  });
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
-      }
+    <Animated.View
+      style={{
+        opacity: cardAnim,
+        transform: [{ translateY }],
+      }}
     >
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Business News
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
-          Latest financial headlines
-        </Text>
-      </View>
-
-      {news.map((article, index) => (
-        <View key={index} style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}>
+      <TouchableOpacity activeOpacity={0.9}>
+        <View style={[
+          styles.newsCard,
+          {
+            backgroundColor: theme.colors.surface,
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+              },
+              android: {
+                elevation: 3,
+              },
+            }),
+          },
+        ]}>
           <Text style={[styles.newsTitle, { color: theme.colors.text }]}>
             {article.title}
           </Text>
@@ -86,7 +77,95 @@ export default function NewsScreen() {
             </Text>
           )}
         </View>
-      ))}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+export default function NewsScreen() {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const theme = useTheme();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    fetchNews();
+  }, []);
+
+  useEffect(() => {
+    if (!loading && news.length > 0) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading, news]);
+
+  const fetchNews = async () => {
+    try {
+      const data = await newsAPI.getNewsFeed();
+      setNews(data);
+    } catch (error) {
+      console.error('Error fetching news:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setRefreshing(true);
+    await fetchNews();
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>
+          Loading news...
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      refreshControl={
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh} 
+          tintColor={theme.colors.primary}
+          colors={[theme.colors.primary]}
+        />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Business News
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
+          Latest financial headlines
+        </Text>
+      </View>
+
+      <Animated.View style={{ opacity: fadeAnim }}>
+        {news.map((article, index) => (
+          <NewsCard
+            key={index}
+            article={article}
+            index={index}
+            theme={theme}
+          />
+        ))}
+      </Animated.View>
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -121,8 +200,10 @@ const styles = StyleSheet.create({
   newsCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   newsTitle: {
     fontSize: 18,
