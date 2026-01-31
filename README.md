@@ -231,7 +231,7 @@ MIT License - feel free to use this project for personal or commercial purposes.
 - [NewsAPI](https://newsapi.org) for news API
 - [Expo](https://expo.dev) for cross-platform development
 - [React Native Paper](https://callstack.github.io/react-native-paper/) for UI components
-
+-------------
 ## 📞 Support
 
 For issues or questions, please open an issue on GitHub.
