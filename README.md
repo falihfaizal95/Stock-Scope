@@ -28,7 +28,7 @@ A modern, cross-platform stock analyzer and researcher app built with React Nati
 - Node-Cache (Caching)
 
 ## 📦 Installation
--------------------------
+---------------------------
 ### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
