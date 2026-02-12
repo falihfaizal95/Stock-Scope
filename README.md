@@ -221,9 +221,7 @@ expo build:web
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
 
-MIT License - feel free to use this project for personal or commercial purposes.
 
 ## 🙏 Acknowledgments
 
@@ -232,13 +230,6 @@ MIT License - feel free to use this project for personal or commercial purposes.
 - [Expo](https://expo.dev) for cross-platform development
 - [React Native Paper](https://callstack.github.io/react-native-paper/) for UI components
 -------------
-## 📞 Support
-
-For issues or questions, please open an issue on GitHub.
-
----
-
-Built with ❤️ using React Native and Node.js
 
 
 
