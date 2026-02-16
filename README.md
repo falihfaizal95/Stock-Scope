@@ -102,7 +102,7 @@ npm start
    - Press `a` for Android Emulator
    - Press `w` for Web
    - Scan QR code with Expo Go app on your phone
-
+---------
 ## 🏗️ Project Structure
 
 ```
