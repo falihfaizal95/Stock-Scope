@@ -358,6 +358,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 0,
     overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   chartHeader: {
     flexDirection: 'row',
