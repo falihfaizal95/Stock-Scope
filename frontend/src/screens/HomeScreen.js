@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,91 +6,17 @@ import {
   RefreshControl,
   TouchableOpacity,
   Dimensions,
-  Animated,
-  Platform,
+  Image,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import * as Haptics from 'expo-haptics';
 import { stockAPI } from '../utils/api';
 import { useWatchlist } from '../context/WatchlistContext';
 import { useTheme } from 'react-native-paper';
+import StockScopeLogo from '../components/StockScopeLogo';
 
 const screenWidth = Dimensions.get('window').width;
-
-// Skeleton Loader Component
-const SkeletonCard = React.memo(({ theme }) => {
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
-  const opacity = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
-
-  return (
-    <View style={[styles.stockCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.stockRow}>
-        <View style={styles.stockInfo}>
-          <Animated.View
-            style={[
-              styles.skeletonBox,
-              { backgroundColor: theme.colors.border, opacity },
-              { width: 80, height: 20, marginBottom: 8 },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.skeletonBox,
-              { backgroundColor: theme.colors.border, opacity },
-              { width: 120, height: 16 },
-            ]}
-          />
-        </View>
-        <Animated.View
-          style={[
-            styles.skeletonBox,
-            { backgroundColor: theme.colors.border, opacity },
-            { width: 100, height: 50 },
-          ]}
-        />
-        <View style={styles.stockPrice}>
-          <Animated.View
-            style={[
-              styles.skeletonBox,
-              { backgroundColor: theme.colors.border, opacity },
-              { width: 70, height: 20, marginBottom: 8 },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.skeletonBox,
-              { backgroundColor: theme.colors.border, opacity },
-              { width: 60, height: 16 },
-            ]}
-          />
-        </View>
-      </View>
-    </View>
-  );
-});
 
 export default function HomeScreen() {
   const [marketData, setMarketData] = useState(null);
@@ -101,32 +27,10 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { watchlist } = useWatchlist();
   const theme = useTheme();
-  
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
     fetchData();
   }, []);
-
-  useEffect(() => {
-    if (!loading) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [loading]);
 
   const fetchData = async () => {
     try {
@@ -136,8 +40,38 @@ export default function HomeScreen() {
         stockAPI.getTopLosers(),
       ]);
       setMarketData(overview);
-      setTopGainers(gainers);
-      setTopLosers(losers);
+      
+      // Combine S&P 500 and NASDAQ with gainers/losers
+      const allStocks = [];
+      
+      // Add S&P 500 and NASDAQ as stock cards
+      if (overview) {
+        allStocks.push({
+          symbol: 'SPY',
+          name: 'S&P 500',
+          price: overview.sp500,
+          changePercent: overview.sp500Change,
+          logo: null,
+        });
+        allStocks.push({
+          symbol: 'QQQ',
+          name: 'NASDAQ',
+          price: overview.nasdaq,
+          changePercent: overview.nasdaqChange,
+          logo: null,
+        });
+      }
+      
+      // Add top gainers
+      allStocks.push(...gainers.slice(0, 10));
+      // Add top losers
+      allStocks.push(...losers.slice(0, 10));
+      
+      // Sort all stocks by change percentage (gainers first)
+      allStocks.sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0));
+      
+      setTopGainers(allStocks.filter(s => s.changePercent >= 0));
+      setTopLosers(allStocks.filter(s => s.changePercent < 0));
     } catch (error) {
       console.error('Error fetching market data:', error);
     } finally {
@@ -146,12 +80,19 @@ export default function HomeScreen() {
     }
   };
 
-  const onRefresh = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const fetchStockDetails = async (symbol) => {
+    try {
+      const details = await stockAPI.getStockDetails(symbol);
+      return details;
+    } catch (error) {
+      console.error('Error fetching stock details:', error);
+      return null;
     }
+  };
+
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchData();
+    fetchData();
   };
 
   // Generate mock chart data for demonstration
@@ -167,70 +108,44 @@ export default function HomeScreen() {
     return data;
   };
 
-// Stock Card Component with animations
-const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, generateChartData }) => {
-  const cardAnim = useRef(new Animated.Value(0)).current;
-  const chartData = useMemo(() => generateChartData(isGainer), [isGainer]);
-  const chartColor = isGainer ? theme.colors.positive : theme.colors.negative;
+  const renderStockCard = (stock, index) => {
+    const isPositive = stock.changePercent >= 0;
+    const chartData = generateChartData(isPositive);
+    const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
+    const cardWidth = (screenWidth - 48) / 3; // 3 cards per row with padding
 
-  useEffect(() => {
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 400,
-      delay: index * 50,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const handlePress = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    navigation.navigate('StockDetail', { symbol: stock.symbol });
-  };
-
-  const scale = cardAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.95, 1],
-  });
-
-  const opacity = cardAnim;
-
-  return (
-    <Animated.View
-      style={{
-        opacity,
-        transform: [{ scale }],
-      }}
-    >
+    return (
       <TouchableOpacity
-        onPress={handlePress}
-        style={[
-          styles.stockCard,
-          {
-            backgroundColor: theme.colors.surface,
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-              },
-              android: {
-                elevation: 3,
-              },
-            }),
-          },
-        ]}
-        activeOpacity={0.8}
+        key={stock.symbol || index}
+        onPress={() => navigation.navigate('StockDetail', { symbol: stock.symbol })}
+        style={[styles.stockCard, { 
+          backgroundColor: theme.colors.surface,
+          width: cardWidth,
+        }]}
+        activeOpacity={0.7}
       >
-        <View style={styles.stockRow}>
+        <View style={styles.stockCardContent}>
+          <View style={styles.stockHeader}>
+            {stock.logo ? (
+              <Image 
+                source={{ uri: stock.logo }} 
+                style={styles.logo}
+              />
+            ) : (
+              <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
+                <Text style={[styles.logoText, { color: theme.colors.placeholder }]}>
+                  {stock.symbol.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+          
           <View style={styles.stockInfo}>
-            <Text style={[styles.stockSymbol, { color: theme.colors.text }]}>
+            <Text style={[styles.stockSymbol, { color: theme.colors.text }]} numberOfLines={1}>
               {stock.symbol}
             </Text>
-            <Text style={[styles.stockName, { color: theme.colors.placeholder }]} numberOfLines={1}>
-              {stock.name}
+            <Text style={[styles.stockName, { color: theme.colors.placeholder }]} numberOfLines={2}>
+              {stock.name || stock.symbol}
             </Text>
           </View>
           
@@ -246,7 +161,7 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
                   },
                 ],
               }}
-              width={screenWidth * 0.3}
+              width={cardWidth - 32}
               height={50}
               withDots={false}
               withShadow={false}
@@ -279,17 +194,17 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
             />
           </View>
 
-          <View style={styles.stockPrice}>
+          <View style={styles.stockPriceRow}>
             <Text style={[styles.price, { color: theme.colors.text }]}>
               ${stock.price?.toFixed(2)}
             </Text>
             <View style={[
               styles.changeBadge,
-              { backgroundColor: isGainer ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.15)' }
+              { backgroundColor: isPositive ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.15)' }
             ]}>
               <Text style={[
                 styles.changeText,
-                { color: isGainer ? theme.colors.positive : theme.colors.negative }
+                { color: isPositive ? theme.colors.positive : theme.colors.negative }
               ]}>
                 {stock.changePercent >= 0 ? '+' : ''}
                 {stock.changePercent?.toFixed(2)}%
@@ -298,52 +213,16 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
           </View>
         </View>
       </TouchableOpacity>
-      </Animated.View>
     );
-  });
-
-  const renderStockCard = (stock, isGainer = true, index = 0) => (
-    <StockCard
-      key={stock.symbol}
-      stock={stock}
-      isGainer={isGainer}
-      index={index}
-      theme={theme}
-      navigation={navigation}
-      generateChartData={generateChartData}
-    />
-  );
+  };
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Stocks
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
-            {new Date().toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-            })}
-          </Text>
-        </View>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Top Gainers
-          </Text>
-          {[1, 2, 3].map((i) => (
-            <SkeletonCard key={i} theme={theme} />
-          ))}
-        </View>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Top Losers
-          </Text>
-          {[1, 2, 3].map((i) => (
-            <SkeletonCard key={i} theme={theme} />
-          ))}
-        </View>
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>
+          Loading market data...
+        </Text>
       </View>
     );
   }
@@ -352,114 +231,41 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh} 
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
       }
-      showsVerticalScrollIndicator={false}
     >
-      <Animated.View
-        style={{
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        }}
-      >
-        <View style={styles.header}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <StockScopeLogo size={40} />
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Stocks
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
-            {new Date().toLocaleDateString('en-US', {
-              month: 'long',
-              day: 'numeric',
-            })}
+            StockScope
           </Text>
         </View>
+        <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
+          {new Date().toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+          })}
+        </Text>
+      </View>
 
-        {marketData && (
-          <Animated.View
-            style={[
-              styles.marketCard,
-              {
-                backgroundColor: theme.colors.surface,
-                ...Platform.select({
-                  ios: {
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 12,
-                  },
-                  android: {
-                    elevation: 4,
-                  },
-                }),
-              },
-            ]}
-          >
-          <View style={styles.marketRow}>
-            <View style={styles.marketItem}>
-              <Text style={[styles.marketLabel, { color: theme.colors.placeholder }]}>
-                S&P 500
-              </Text>
-              <Text style={[styles.marketValue, { color: theme.colors.text }]}>
-                {marketData.sp500?.toFixed(2)}
-              </Text>
-              <Text
-                style={[
-                  styles.marketChange,
-                  {
-                    color: marketData.sp500Change >= 0
-                      ? theme.colors.positive
-                      : theme.colors.negative,
-                  },
-                ]}
-              >
-                {marketData.sp500Change >= 0 ? '+' : ''}
-                {marketData.sp500Change?.toFixed(2)}%
-              </Text>
-            </View>
-            <View style={[styles.marketDivider, { backgroundColor: theme.colors.border }]} />
-            <View style={styles.marketItem}>
-              <Text style={[styles.marketLabel, { color: theme.colors.placeholder }]}>
-                NASDAQ
-              </Text>
-              <Text style={[styles.marketValue, { color: theme.colors.text }]}>
-                {marketData.nasdaq?.toFixed(2)}
-              </Text>
-              <Text
-                style={[
-                  styles.marketChange,
-                  {
-                    color: marketData.nasdaqChange >= 0
-                      ? theme.colors.positive
-                      : theme.colors.negative,
-                  },
-                ]}
-              >
-                {marketData.nasdaqChange >= 0 ? '+' : ''}
-                {marketData.nasdaqChange?.toFixed(2)}%
-              </Text>
-            </View>
-          </View>
-          </Animated.View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Top Gainers
-          </Text>
-          {topGainers.map((stock, index) => renderStockCard(stock, true, index))}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Top Gainers
+        </Text>
+        <View style={styles.stockGrid}>
+          {topGainers.map((stock, index) => renderStockCard(stock, index))}
         </View>
+      </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Top Losers
-          </Text>
-          {topLosers.map((stock, index) => renderStockCard(stock, false, index))}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Top Losers
+        </Text>
+        <View style={styles.stockGrid}>
+          {topLosers.map((stock, index) => renderStockCard(stock, index))}
         </View>
+      </View>
 
       {watchlist.length > 0 && (
         <View style={styles.section}>
@@ -480,14 +286,21 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
                 style={[styles.stockCard, { backgroundColor: theme.colors.surface }]}
                 activeOpacity={0.7}
               >
-                <View style={styles.stockRow}>
-                  <View style={styles.stockInfo}>
-                    <Text style={[styles.stockSymbol, { color: theme.colors.text }]}>
-                      {item.symbol}
-                    </Text>
-                    <Text style={[styles.stockName, { color: theme.colors.placeholder }]}>
-                      {item.name}
-                    </Text>
+                <View style={styles.stockCardContent}>
+                  <View style={styles.stockHeader}>
+                    <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
+                      <Text style={[styles.logoText, { color: theme.colors.placeholder }]}>
+                        {item.symbol.charAt(0)}
+                      </Text>
+                    </View>
+                    <View style={styles.stockInfo}>
+                      <Text style={[styles.stockSymbol, { color: theme.colors.text }]}>
+                        {item.symbol}
+                      </Text>
+                      <Text style={[styles.stockName, { color: theme.colors.placeholder }]}>
+                        {item.name}
+                      </Text>
+                    </View>
                   </View>
                   
                   <View style={styles.chartContainer}>
@@ -502,8 +315,8 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
                           },
                         ],
                       }}
-                      width={screenWidth * 0.3}
-                      height={50}
+                      width={screenWidth - 120}
+                      height={60}
                       withDots={false}
                       withShadow={false}
                       withVerticalLines={false}
@@ -535,20 +348,22 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
                     />
                   </View>
 
-                  <View style={styles.stockPrice}>
-                    <Text style={[styles.price, { color: theme.colors.text }]}>
-                      $150.25
-                    </Text>
-                    <View style={[
-                      styles.changeBadge,
-                      { backgroundColor: isPositive ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.15)' }
-                    ]}>
-                      <Text style={[
-                        styles.changeText,
-                        { color: isPositive ? theme.colors.positive : theme.colors.negative }
-                      ]}>
-                        {isPositive ? '+' : ''}2.15%
+                  <View style={styles.stockPriceRow}>
+                    <View style={styles.stockPrice}>
+                      <Text style={[styles.price, { color: theme.colors.text }]}>
+                        $150.25
                       </Text>
+                      <View style={[
+                        styles.changeBadge,
+                        { backgroundColor: isPositive ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.15)' }
+                      ]}>
+                        <Text style={[
+                          styles.changeText,
+                          { color: isPositive ? theme.colors.positive : theme.colors.negative }
+                        ]}>
+                          {isPositive ? '+' : ''}2.15%
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -558,8 +373,7 @@ const StockCard = React.memo(({ stock, isGainer, index, theme, navigation, gener
         </View>
       )}
 
-        <View style={styles.bottomPadding} />
-      </Animated.View>
+      <View style={styles.bottomPadding} />
     </ScrollView>
   );
 }
@@ -581,10 +395,15 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 16,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   headerTitle: {
     fontSize: 36,
     fontWeight: '700',
-    marginBottom: 4,
+    marginLeft: 12,
   },
   headerSubtitle: {
     fontSize: 16,
@@ -629,46 +448,74 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
   },
+  stockGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
   stockCard: {
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     borderRadius: 16,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginHorizontal: 2,
   },
-  skeletonBox: {
-    borderRadius: 8,
-  },
-  stockRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  stockCardContent: {
+    width: '100%',
     alignItems: 'center',
   },
+  stockHeader: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  logoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
   stockInfo: {
-    flex: 1,
-    marginRight: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   stockSymbol: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 4,
+    textAlign: 'center',
   },
   stockName: {
-    fontSize: 14,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   chartContainer: {
-    width: screenWidth * 0.3,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
+    height: 50,
   },
-  stockPrice: {
-    alignItems: 'flex-end',
-    marginLeft: 12,
+  stockPriceRow: {
+    width: '100%',
+    alignItems: 'center',
   },
   price: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   changeBadge: {
     paddingHorizontal: 8,

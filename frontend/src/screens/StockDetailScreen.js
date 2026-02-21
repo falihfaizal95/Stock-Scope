@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Animated,
-  Platform,
 } from 'react-native';
 import {
   Text,
@@ -15,10 +13,10 @@ import {
 } from 'react-native-paper';
 import { useRoute } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import * as Haptics from 'expo-haptics';
 import { stockAPI, newsAPI } from '../utils/api';
 import { useWatchlist } from '../context/WatchlistContext';
 import { useTheme } from 'react-native-paper';
+import ExpandedChart from '../components/ExpandedChart';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -28,42 +26,15 @@ export default function StockDetailScreen() {
   const [stock, setStock] = useState(null);
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [chartExpanded, setChartExpanded] = useState(false);
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
   const theme = useTheme();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const priceAnim = useRef(new Animated.Value(0)).current;
 
   const inWatchlist = isInWatchlist(symbol);
 
   useEffect(() => {
     fetchStockDetails();
   }, [symbol]);
-
-  useEffect(() => {
-    if (!loading && stock) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.spring(priceAnim, {
-          toValue: 1,
-          tension: 40,
-          friction: 5,
-          delay: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [loading, stock]);
 
   const fetchStockDetails = async () => {
     setLoading(true);
@@ -82,9 +53,6 @@ export default function StockDetailScreen() {
   };
 
   const handleWatchlistToggle = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
     if (inWatchlist) {
       const watchlistItem = watchlist.find((item) => item.symbol === symbol);
       if (watchlistItem) {
@@ -134,37 +102,9 @@ export default function StockDetailScreen() {
   const chartData = generateChartData();
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
 
-  const priceScale = priceAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.8, 1],
-  });
-
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            backgroundColor: theme.colors.surface,
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 12,
-              },
-              android: {
-                elevation: 4,
-              },
-            }),
-          },
-        ]}
-      >
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.stockHeader}>
           <View>
             <Text style={[styles.symbol, { color: theme.colors.text }]}>
@@ -174,7 +114,7 @@ export default function StockDetailScreen() {
               {stock.name}
             </Text>
           </View>
-          <Animated.View style={[styles.priceContainer, { transform: [{ scale: priceScale }] }]}>
+          <View style={styles.priceContainer}>
             <Text style={[styles.price, { color: theme.colors.text }]}>
               ${stock.price?.toFixed(2)}
             </Text>
@@ -203,32 +143,26 @@ export default function StockDetailScreen() {
         >
           {inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
         </Button>
-      </Animated.View>
+      </View>
 
       {/* Large Chart */}
-      <Animated.View
-        style={[
-          styles.chartCard,
-          {
-            backgroundColor: theme.colors.surface,
-            opacity: fadeAnim,
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 12,
-              },
-              android: {
-                elevation: 4,
-              },
-            }),
-          },
-        ]}
-      >
-        <Text style={[styles.chartTitle, { color: theme.colors.text }]}>
-          1 Day Chart
-        </Text>
+      <View style={[styles.chartCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={styles.chartHeader}>
+          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>
+            1 Day Chart
+          </Text>
+          <Button
+            mode="contained"
+            onPress={() => setChartExpanded(true)}
+            buttonColor={theme.colors.primary}
+            textColor="#000"
+            labelStyle={{ fontSize: 12, fontWeight: '600' }}
+            contentStyle={{ paddingHorizontal: 12, paddingVertical: 4 }}
+            style={styles.expandButton}
+          >
+            Expand Chart
+          </Button>
+        </View>
         <LineChart
           data={{
             labels: ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
@@ -272,28 +206,9 @@ export default function StockDetailScreen() {
             borderRadius: 0,
           }}
         />
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.colors.surface,
-            opacity: fadeAnim,
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 12,
-              },
-              android: {
-                elevation: 4,
-              },
-            }),
-          },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
           Key Statistics
         </Text>
@@ -331,7 +246,7 @@ export default function StockDetailScreen() {
             </Text>
           </View>
         </View>
-      </Animated.View>
+      </View>
 
       {news.length > 0 && (
         <View style={styles.newsSection}>
@@ -362,6 +277,13 @@ export default function StockDetailScreen() {
       )}
 
       <View style={styles.bottomPadding} />
+      
+      <ExpandedChart
+        visible={chartExpanded}
+        onClose={() => setChartExpanded(false)}
+        symbol={symbol}
+        stockData={stock}
+      />
     </ScrollView>
   );
 }
@@ -389,13 +311,21 @@ const styles = StyleSheet.create({
   chartCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 20,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 16,
+  },
+  expandButton: {
+    borderRadius: 8,
   },
   stockHeader: {
     flexDirection: 'row',
@@ -433,7 +363,7 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 20,
   },
   cardTitle: {
@@ -468,21 +398,8 @@ const styles = StyleSheet.create({
   },
   newsCard: {
     marginBottom: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   newsTitle: {
     fontSize: 16,

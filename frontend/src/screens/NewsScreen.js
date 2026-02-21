@@ -1,107 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Animated,
-  Platform,
   TouchableOpacity,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
-import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
 import { newsAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
-// News Card Component
-const NewsCard = React.memo(({ article, index, theme }) => {
-  const cardAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 400,
-      delay: index * 50,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const translateY = cardAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [20, 0],
-  });
-
-  return (
-    <Animated.View
-      style={{
-        opacity: cardAnim,
-        transform: [{ translateY }],
-      }}
-    >
-      <TouchableOpacity activeOpacity={0.9}>
-        <View style={[
-          styles.newsCard,
-          {
-            backgroundColor: theme.colors.surface,
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-              },
-              android: {
-                elevation: 3,
-              },
-            }),
-          },
-        ]}>
-          <Text style={[styles.newsTitle, { color: theme.colors.text }]}>
-            {article.title}
-          </Text>
-          <View style={styles.newsMeta}>
-            <Text style={[styles.newsSource, { color: theme.colors.primary }]}>
-              {article.source}
-            </Text>
-            <Text style={[styles.newsDate, { color: theme.colors.placeholder }]}>
-              {new Date(article.publishedAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-          </View>
-          {article.description && (
-            <Text style={[styles.newsDescription, { color: theme.colors.placeholder }]}>
-              {article.description}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
+const screenWidth = Dimensions.get('window').width;
 
 export default function NewsScreen() {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const navigation = useNavigation();
   const theme = useTheme();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchNews();
   }, []);
-
-  useEffect(() => {
-    if (!loading && news.length > 0) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [loading, news]);
 
   const fetchNews = async () => {
     try {
@@ -115,12 +38,9 @@ export default function NewsScreen() {
     }
   };
 
-  const onRefresh = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchNews();
+    fetchNews();
   };
 
   if (loading) {
@@ -138,14 +58,8 @@ export default function NewsScreen() {
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh} 
-          tintColor={theme.colors.primary}
-          colors={[theme.colors.primary]}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
       }
-      showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
@@ -156,16 +70,43 @@ export default function NewsScreen() {
         </Text>
       </View>
 
-      <Animated.View style={{ opacity: fadeAnim }}>
-        {news.map((article, index) => (
-          <NewsCard
-            key={index}
-            article={article}
-            index={index}
-            theme={theme}
-          />
-        ))}
-      </Animated.View>
+      {news.map((article, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('NewsDetail', { article })}
+        >
+          {article.imageUrl && (
+            <Image
+              source={{ uri: article.imageUrl }}
+              style={styles.newsImage}
+              resizeMode="cover"
+            />
+          )}
+          <View style={styles.newsContent}>
+            <Text style={[styles.newsTitle, { color: theme.colors.text }]} numberOfLines={3}>
+              {article.title}
+            </Text>
+            {article.description && (
+              <Text style={[styles.newsDescription, { color: theme.colors.placeholder }]} numberOfLines={2}>
+                {article.description}
+              </Text>
+            )}
+            <View style={styles.newsMeta}>
+              <Text style={[styles.newsSource, { color: theme.colors.primary }]}>
+                {article.source}
+              </Text>
+              <Text style={[styles.newsDate, { color: theme.colors.placeholder }]}>
+                {new Date(article.publishedAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -199,33 +140,45 @@ const styles = StyleSheet.create({
   },
   newsCard: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  newsImage: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#2c2c2e',
+  },
+  newsContent: {
     padding: 16,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   newsTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: '700',
+    marginBottom: 8,
     lineHeight: 24,
-  },
-  newsMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  newsSource: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  newsDate: {
-    fontSize: 14,
   },
   newsDescription: {
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  newsMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  newsSource: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  newsDate: {
+    fontSize: 13,
   },
   bottomPadding: {
     height: 20,

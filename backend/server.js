@@ -147,22 +147,40 @@ app.get('/api/market/gainers', async (req, res) => {
       return res.json(cached);
     }
 
-    // Popular stocks for demo
-    const popularStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
+    // Expanded list of US stocks from major exchanges (NYSE, NASDAQ)
+    const usStocks = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'PYPL', 'CRM',
+      'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC', 'XOM', 'CVX', 'ABBV', 'PFE',
+      'KO', 'AVGO', 'COST', 'MRK', 'PEP', 'TMO', 'ABT', 'CSCO', 'ACN', 'NKE', 'ADBE', 'TXN', 'CMCSA',
+      'NEE', 'LIN', 'PM', 'RTX', 'HON', 'QCOM', 'AMGN', 'BMY', 'UPS', 'SBUX', 'LOW', 'INTU', 'AMAT',
+      'DE', 'CAT', 'GE', 'GS', 'AXP', 'BLK', 'BKNG', 'ELV', 'TJX', 'MDT', 'GILD', 'ISRG', 'SYK',
+      'ZTS', 'ADP', 'CI', 'EQIX', 'APH', 'KLAC', 'CDNS', 'SNPS', 'MCHP', 'FTNT', 'ANET', 'CRWD',
+      'PANW', 'NET', 'DDOG', 'ZS', 'OKTA', 'TEAM', 'DOCN', 'ESTC', 'MDB', 'NOW', 'VEEV', 'WDAY',
+      'PLTR', 'SNOW', 'DDOG', 'RPD', 'FROG', 'ASAN', 'U', 'BILL', 'COUP', 'ZM', 'DOCU', 'CLOU',
+      'SPOT', 'ROKU', 'SQ', 'SHOP', 'ETSY', 'PINS', 'SNAP', 'TWTR', 'UBER', 'LYFT', 'DASH', 'ABNB',
+      'RBLX', 'HOOD', 'COIN', 'SOFI', 'AFRM', 'UPST', 'LC', 'OPEN', 'Z', 'RDFN', 'COMP', 'RKT'
+    ];
     
     const stocks = await Promise.all(
-      popularStocks.map(async (symbol) => {
+      usStocks.map(async (symbol) => {
         try {
-          const response = await axios.get(
-            `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-          );
-          const data = response.data;
+          const [quoteResponse, profileResponse] = await Promise.all([
+            axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`),
+            axios.get(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
+          ]);
+          const data = quoteResponse.data;
+          const profile = profileResponse.data;
+          
+          // Only include stocks with valid data and positive change
+          if (!data.c || data.dp === undefined) return null;
+          
           return {
             symbol,
-            name: symbol, // You can enhance this with profile API
+            name: profile.name || symbol,
             price: data.c,
             change: data.d,
             changePercent: data.dp,
+            logo: profile.logo,
           };
         } catch (error) {
           return null;
@@ -172,9 +190,9 @@ app.get('/api/market/gainers', async (req, res) => {
 
     const validStocks = stocks.filter(Boolean);
     const gainers = validStocks
-      .filter((stock) => stock.changePercent > 0)
+      .filter((stock) => stock.changePercent > 0 && stock.price > 0)
       .sort((a, b) => b.changePercent - a.changePercent)
-      .slice(0, 5);
+      .slice(0, 20);
 
     setCachedData(cacheKey, gainers);
     res.json(gainers);
@@ -193,22 +211,40 @@ app.get('/api/market/losers', async (req, res) => {
       return res.json(cached);
     }
 
-    // Popular stocks for demo
-    const popularStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
+    // Expanded list of US stocks from major exchanges (NYSE, NASDAQ)
+    const usStocks = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'PYPL', 'CRM',
+      'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC', 'XOM', 'CVX', 'ABBV', 'PFE',
+      'KO', 'AVGO', 'COST', 'MRK', 'PEP', 'TMO', 'ABT', 'CSCO', 'ACN', 'NKE', 'ADBE', 'TXN', 'CMCSA',
+      'NEE', 'LIN', 'PM', 'RTX', 'HON', 'QCOM', 'AMGN', 'BMY', 'UPS', 'SBUX', 'LOW', 'INTU', 'AMAT',
+      'DE', 'CAT', 'GE', 'GS', 'AXP', 'BLK', 'BKNG', 'ELV', 'TJX', 'MDT', 'GILD', 'ISRG', 'SYK',
+      'ZTS', 'ADP', 'CI', 'EQIX', 'APH', 'KLAC', 'CDNS', 'SNPS', 'MCHP', 'FTNT', 'ANET', 'CRWD',
+      'PANW', 'NET', 'DDOG', 'ZS', 'OKTA', 'TEAM', 'DOCN', 'ESTC', 'MDB', 'NOW', 'VEEV', 'WDAY',
+      'PLTR', 'SNOW', 'DDOG', 'RPD', 'FROG', 'ASAN', 'U', 'BILL', 'COUP', 'ZM', 'DOCU', 'CLOU',
+      'SPOT', 'ROKU', 'SQ', 'SHOP', 'ETSY', 'PINS', 'SNAP', 'TWTR', 'UBER', 'LYFT', 'DASH', 'ABNB',
+      'RBLX', 'HOOD', 'COIN', 'SOFI', 'AFRM', 'UPST', 'LC', 'OPEN', 'Z', 'RDFN', 'COMP', 'RKT'
+    ];
     
     const stocks = await Promise.all(
-      popularStocks.map(async (symbol) => {
+      usStocks.map(async (symbol) => {
         try {
-          const response = await axios.get(
-            `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-          );
-          const data = response.data;
+          const [quoteResponse, profileResponse] = await Promise.all([
+            axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`),
+            axios.get(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
+          ]);
+          const data = quoteResponse.data;
+          const profile = profileResponse.data;
+          
+          // Only include stocks with valid data and negative change
+          if (!data.c || data.dp === undefined) return null;
+          
           return {
             symbol,
-            name: symbol,
+            name: profile.name || symbol,
             price: data.c,
             change: data.d,
             changePercent: data.dp,
+            logo: profile.logo,
           };
         } catch (error) {
           return null;
@@ -218,9 +254,9 @@ app.get('/api/market/losers', async (req, res) => {
 
     const validStocks = stocks.filter(Boolean);
     const losers = validStocks
-      .filter((stock) => stock.changePercent < 0)
+      .filter((stock) => stock.changePercent < 0 && stock.price > 0)
       .sort((a, b) => a.changePercent - b.changePercent)
-      .slice(0, 5);
+      .slice(0, 20);
 
     setCachedData(cacheKey, losers);
     res.json(losers);
@@ -241,7 +277,7 @@ app.get('/api/news', async (req, res) => {
 
     // Using NewsAPI
     const response = await axios.get(
-      `https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=10&apiKey=${NEWS_API_KEY}`
+      `https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=20&apiKey=${NEWS_API_KEY}`
     );
 
     const news = response.data.articles.map((article) => ({
@@ -251,6 +287,8 @@ app.get('/api/news', async (req, res) => {
       url: article.url,
       publishedAt: article.publishedAt,
       imageUrl: article.urlToImage,
+      content: article.content,
+      author: article.author,
     }));
 
     setCachedData(cacheKey, news);
@@ -258,6 +296,39 @@ app.get('/api/news', async (req, res) => {
   } catch (error) {
     console.error('News error:', error.message);
     res.status(500).json({ error: 'Failed to fetch news' });
+  }
+});
+
+// Get Wall Street Journal news
+app.get('/api/news/wsj', async (req, res) => {
+  try {
+    const cacheKey = 'wsj_news';
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Using NewsAPI with WSJ source
+    const response = await axios.get(
+      `https://newsapi.org/v2/everything?sources=the-wall-street-journal&pageSize=10&apiKey=${NEWS_API_KEY}`
+    );
+
+    const news = response.data.articles.map((article) => ({
+      title: article.title,
+      description: article.description,
+      source: article.source.name,
+      url: article.url,
+      publishedAt: article.publishedAt,
+      imageUrl: article.urlToImage,
+      content: article.content,
+      author: article.author,
+    }));
+
+    setCachedData(cacheKey, news);
+    res.json(news);
+  } catch (error) {
+    console.error('WSJ news error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch WSJ news' });
   }
 });
 

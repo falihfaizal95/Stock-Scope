@@ -1,0 +1,57 @@
+/* Web-specific tab hover effects */
+@media (hover: hover) {
+  /* Target React Navigation tab buttons - all 4 tabs */
+  button[role="button"]:hover,
+  div[role="button"]:hover,
+  a[role="button"]:hover {
+    background-color: rgba(52, 199, 89, 0.15) !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease-in-out !important;
+    transform: translateY(-2px) !important;
+  }
+
+  button[role="button"]:active,
+  div[role="button"]:active,
+  a[role="button"]:active {
+    background-color: rgba(52, 199, 89, 0.25) !important;
+    transform: scale(0.95) translateY(0) !important;
+  }
+
+  /* Icon hover effects */
+  button[role="button"]:hover svg,
+  div[role="button"]:hover svg,
+  a[role="button"]:hover svg {
+    transform: scale(1.15);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Label hover effects */
+  button[role="button"]:hover span,
+  div[role="button"]:hover span,
+  a[role="button"]:hover span {
+    color: #34c759 !important;
+    transition: color 0.3s ease-in-out;
+  }
+}
+
+/* Smooth transitions for tab items */
+button[role="button"],
+div[role="button"],
+a[role="button"] {
+  transition: all 0.3s ease-in-out !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+}
+
+/* Active tab styling */
+button[role="button"][aria-selected="true"],
+div[role="button"][aria-selected="true"],
+a[role="button"][aria-selected="true"] {
+  background-color: rgba(52, 199, 89, 0.1) !important;
+}
+
+/* Tab bar container */
+nav[role="tablist"],
+div[role="tablist"] {
+  transition: all 0.3s ease-in-out;
+}

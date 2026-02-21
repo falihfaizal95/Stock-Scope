@@ -8,6 +8,7 @@ import SearchScreen from '../screens/SearchScreen';
 import NewsScreen from '../screens/NewsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import StockDetailScreen from '../screens/StockDetailScreen';
+import NewsDetailScreen from '../screens/NewsDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,7 +32,17 @@ function HomeTabs() {
             iconName = focused ? 'account' : 'account-outline';
           }
 
-          return <Icon name={iconName} size={focused ? 26 : 24} color={color} />;
+          return (
+            <Icon 
+              name={iconName} 
+              size={focused ? 26 : 24} 
+              color={color}
+              style={{
+                transition: 'all 0.2s ease-in-out',
+                transform: focused ? [{ scale: 1.1 }] : [{ scale: 1 }],
+              }}
+            />
+          );
         },
         tabBarActiveTintColor: '#34c759', // Apple Green
         tabBarInactiveTintColor: '#8e8e93',
@@ -44,6 +55,8 @@ function HomeTabs() {
           height: 70,
           elevation: 0,
           shadowOpacity: 0,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -51,7 +64,12 @@ function HomeTabs() {
           marginTop: 4,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          paddingVertical: 8,
+          borderRadius: 12,
+          marginHorizontal: 2,
+        },
+        tabBarIconStyle: {
+          marginBottom: 2,
         },
         headerShown: false,
       })}
@@ -107,6 +125,17 @@ export default function MainNavigator() {
             options={{ 
               headerShown: true, 
               title: 'Stock Details',
+              headerStyle: { backgroundColor: '#1c1c1e' },
+              headerTintColor: '#ffffff',
+              headerTitleStyle: { fontWeight: '700' },
+            }}
+          />
+          <Stack.Screen 
+            name="NewsDetail" 
+            component={NewsDetailScreen}
+            options={{ 
+              headerShown: true, 
+              title: 'News Article',
               headerStyle: { backgroundColor: '#1c1c1e' },
               headerTintColor: '#ffffff',
               headerTitleStyle: { fontWeight: '700' },

@@ -73,6 +73,17 @@ export const newsAPI = {
     }
   },
 
+  // Get Wall Street Journal news
+  getWSJNews: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/news/wsj`);
+      return response.data;
+    } catch (error) {
+      console.error('WSJ news error:', error);
+      throw error;
+    }
+  },
+
   // Get news for specific symbol
   getStockNews: async (symbol) => {
     try {

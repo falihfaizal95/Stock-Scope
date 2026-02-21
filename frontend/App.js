@@ -8,6 +8,11 @@ import { AuthProvider } from './src/context/AuthContext';
 import { WatchlistProvider } from './src/context/WatchlistContext';
 import { theme } from './src/utils/theme';
 
+// Import web-specific styles
+if (Platform.OS === 'web') {
+  require('./src/navigation/tabStyles.css');
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
