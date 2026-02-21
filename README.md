@@ -13,7 +13,7 @@ A modern, cross-platform stock analyzer and researcher app built with React Nati
 - **Cross-Platform**: iOS, Android, and Web support via Expo
 
 ## 📱 Tech Stack
------------------------
+------------------------
 ### Frontend
 - React Native + Expo
 - React Navigation (Bottom Tabs + Stack)
