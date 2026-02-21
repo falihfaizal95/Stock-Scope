@@ -42,16 +42,9 @@ app.get('/api/stock/search', async (req, res) => {
       `https://finnhub.io/api/v1/search?q=${q}&token=${FINNHUB_API_KEY}`
     );
 
-    // Filter to include stocks, ETFs, and other securities
-    const allResults = response.data.result
-      .filter((item) => 
-        item.type === 'Common Stock' || 
-        item.type === 'ETF' || 
-        item.type === 'ETP' ||
-        item.type === 'REIT' ||
-        item.type === 'ADR'
-      )
-      .slice(0, 50); // Return up to 50 results
+    // Filter to include stocks, ETFs, crypto, and other securities
+    // Don't filter - include all types to catch everything
+    const allResults = response.data.result.slice(0, 100); // Return up to 100 results
 
     // Get additional data for each result
     const results = await Promise.all(
@@ -99,18 +92,34 @@ app.get('/api/stock/:symbol', async (req, res) => {
       return res.json(cached);
     }
 
-    // Get quote
-    const quoteResponse = await axios.get(
-      `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-    );
+    // Get quote - handle errors gracefully
+    let quoteResponse, profileResponse;
+    try {
+      quoteResponse = await axios.get(
+        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+      );
+    } catch (error) {
+      console.error('Quote error:', error.message);
+      return res.status(404).json({ error: 'Stock not found' });
+    }
 
-    // Get company profile
-    const profileResponse = await axios.get(
-      `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-    );
+    // Get company profile - optional, don't fail if missing
+    try {
+      profileResponse = await axios.get(
+        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+      );
+    } catch (error) {
+      console.error('Profile error:', error.message);
+      profileResponse = { data: {} };
+    }
 
     const quote = quoteResponse.data;
-    const profile = profileResponse.data;
+    const profile = profileResponse.data || {};
+
+    // Validate quote data
+    if (!quote || quote.c === undefined || quote.c === null) {
+      return res.status(404).json({ error: 'Stock data not available' });
+    }
 
     const stockData = {
       symbol: symbol,
@@ -328,6 +337,52 @@ app.get('/api/news', async (req, res) => {
   } catch (error) {
     console.error('News error:', error.message);
     res.status(500).json({ error: 'Failed to fetch news' });
+  }
+});
+
+// Get crypto prices
+app.get('/api/crypto', async (req, res) => {
+  try {
+    const cacheKey = 'crypto_prices';
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Popular cryptocurrencies
+    const cryptoList = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'SOL-USD', 'ADA-USD', 'XRP-USD', 'DOGE-USD', 'DOT-USD'];
+    
+    const crypto = await Promise.all(
+      cryptoList.map(async (symbol) => {
+        try {
+          // Using Finnhub crypto symbol format
+          const finnhubSymbol = symbol.replace('-USD', '');
+          const response = await axios.get(
+            `https://finnhub.io/api/v1/quote?symbol=BINANCE:${finnhubSymbol}USDT&token=${FINNHUB_API_KEY}`
+          );
+          const data = response.data;
+          
+          if (!data.c || data.dp === undefined) return null;
+          
+          return {
+            symbol: finnhubSymbol,
+            name: finnhubSymbol === 'BTC' ? 'Bitcoin' : finnhubSymbol === 'ETH' ? 'Ethereum' : finnhubSymbol,
+            price: data.c,
+            changePercent: data.dp,
+            logo: null,
+          };
+        } catch (error) {
+          return null;
+        }
+      })
+    );
+
+    const validCrypto = crypto.filter(Boolean);
+    setCachedData(cacheKey, validCrypto);
+    res.json(validCrypto);
+  } catch (error) {
+    console.error('Crypto error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch crypto' });
   }
 });
 

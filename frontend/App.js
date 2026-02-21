@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MainNavigator from './src/navigation/MainNavigator';
 import { AuthProvider } from './src/context/AuthContext';
 import { WatchlistProvider } from './src/context/WatchlistContext';
+import { PortfolioProvider } from './src/context/PortfolioContext';
 import { theme } from './src/utils/theme';
 
 // Import web-specific styles
@@ -19,7 +20,8 @@ export default function App() {
       <PaperProvider theme={theme}>
         <AuthProvider>
           <WatchlistProvider>
-            <NavigationContainer
+            <PortfolioProvider>
+              <NavigationContainer
               theme={{
                 dark: true,
                 colors: {
@@ -38,6 +40,7 @@ export default function App() {
               />
               <MainNavigator />
             </NavigationContainer>
+            </PortfolioProvider>
           </WatchlistProvider>
         </AuthProvider>
       </PaperProvider>

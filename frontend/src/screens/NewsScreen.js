@@ -83,6 +83,7 @@ export default function NewsScreen() {
                 source={{ uri: article.imageUrl }}
                 style={styles.newsImage}
                 resizeMode="cover"
+                onError={() => {}}
               />
             ) : (
               <View style={[styles.newsImagePlaceholder, { backgroundColor: theme.colors.border }]}>
@@ -163,6 +164,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 150,
     backgroundColor: '#2c2c2e',
+    alignSelf: 'center',
   },
   newsImagePlaceholder: {
     width: '100%',

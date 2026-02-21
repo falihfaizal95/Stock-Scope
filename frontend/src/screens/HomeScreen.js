@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { stockAPI } from '../utils/api';
 import { useWatchlist } from '../context/WatchlistContext';
+import { usePortfolio } from '../context/PortfolioContext';
 import { useTheme } from 'react-native-paper';
 import StockScopeLogo from '../components/StockScopeLogo';
 
@@ -22,10 +23,12 @@ export default function HomeScreen() {
   const [marketData, setMarketData] = useState(null);
   const [topGainers, setTopGainers] = useState([]);
   const [topLosers, setTopLosers] = useState([]);
+  const [crypto, setCrypto] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const { watchlist } = useWatchlist();
+  const { portfolio } = usePortfolio();
   const theme = useTheme();
 
   useEffect(() => {
@@ -34,10 +37,11 @@ export default function HomeScreen() {
 
   const fetchData = async () => {
     try {
-      const [overview, gainers, losers] = await Promise.all([
+      const [overview, gainers, losers, cryptoData] = await Promise.all([
         stockAPI.getMarketOverview(),
         stockAPI.getTopGainers(),
         stockAPI.getTopLosers(),
+        stockAPI.getCrypto(),
       ]);
       setMarketData(overview);
       
@@ -72,6 +76,7 @@ export default function HomeScreen() {
       
       setTopGainers(allStocks.filter(s => s.changePercent >= 0));
       setTopLosers(allStocks.filter(s => s.changePercent < 0));
+      setCrypto(cryptoData || []);
     } catch (error) {
       console.error('Error fetching market data:', error);
     } finally {
@@ -249,6 +254,40 @@ export default function HomeScreen() {
         </Text>
       </View>
 
+      {portfolio && (
+        <View style={[styles.portfolioCard, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.portfolioTitle, { color: theme.colors.text }]}>
+            Your Portfolio
+          </Text>
+          <View style={styles.portfolioRow}>
+            <View>
+              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
+                Cash
+              </Text>
+              <Text style={[styles.portfolioValue, { color: theme.colors.text }]}>
+                ${portfolio.cash?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
+            <View>
+              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
+                Holdings
+              </Text>
+              <Text style={[styles.portfolioValue, { color: theme.colors.text }]}>
+                {portfolio.holdings?.length || 0}
+              </Text>
+            </View>
+            <View>
+              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
+                Total Value
+              </Text>
+              <Text style={[styles.portfolioValue, { color: theme.colors.primary }]}>
+                ${portfolio.totalValue?.toFixed(2) || portfolio.cash?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
           Top Gainers
@@ -266,6 +305,17 @@ export default function HomeScreen() {
           {topLosers.map((stock, index) => renderStockCard(stock, index))}
         </View>
       </View>
+
+      {crypto.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Cryptocurrency
+          </Text>
+          <View style={styles.stockGrid}>
+            {crypto.map((coin, index) => renderStockCard(coin, index))}
+          </View>
+        </View>
+      )}
 
       {watchlist.length > 0 && (
         <View style={styles.section}>
@@ -528,5 +578,33 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  portfolioCard: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  portfolioTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  portfolioRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  portfolioLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  portfolioValue: {
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

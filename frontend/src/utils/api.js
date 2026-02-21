@@ -59,6 +59,17 @@ export const stockAPI = {
       throw error;
     }
   },
+
+  // Get crypto prices
+  getCrypto: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/crypto`);
+      return response.data;
+    } catch (error) {
+      console.error('Crypto error:', error);
+      return [];
+    }
+  },
 };
 
 export const newsAPI = {
