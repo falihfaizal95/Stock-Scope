@@ -41,7 +41,7 @@ export default function SearchScreen() {
       } else {
         setResults([]);
       }
-    }, 500);
+    }, 300); // Reduced delay for faster results
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);

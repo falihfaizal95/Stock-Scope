@@ -19,6 +19,10 @@ const { width, height } = Dimensions.get('window');
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [birthday, setBirthday] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [state, setState] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -30,9 +34,16 @@ export default function LoginScreen() {
       return;
     }
 
+    if (isSignUp) {
+      if (!fullName || !birthday || !occupation || !state) {
+        alert('Please fill in all sign up fields');
+        return;
+      }
+    }
+
     setLoading(true);
     const result = isSignUp 
-      ? await signUp(email, password)
+      ? await signUp(email, password, { fullName, birthday, occupation, state })
       : await signIn(email, password);
 
     setLoading(false);
@@ -96,6 +107,27 @@ export default function LoginScreen() {
               </Text>
 
               <View style={styles.inputContainer}>
+                {isSignUp && (
+                  <TextInput
+                    label="Full Legal Name"
+                    value={fullName}
+                    onChangeText={setFullName}
+                    mode="outlined"
+                    autoCapitalize="words"
+                    style={styles.input}
+                    contentStyle={{ color: theme.colors.text }}
+                    theme={{
+                      colors: {
+                        primary: theme.colors.primary,
+                        background: 'transparent',
+                        text: theme.colors.text,
+                        placeholder: theme.colors.placeholder,
+                        outline: theme.colors.border,
+                      }
+                    }}
+                  />
+                )}
+
                 <TextInput
                   label="Email"
                   value={email}
@@ -134,6 +166,67 @@ export default function LoginScreen() {
                     }
                   }}
                 />
+
+                {isSignUp && (
+                  <>
+                    <TextInput
+                      label="Birthday (MM/DD/YYYY)"
+                      value={birthday}
+                      onChangeText={setBirthday}
+                      mode="outlined"
+                      placeholder="MM/DD/YYYY"
+                      style={styles.input}
+                      contentStyle={{ color: theme.colors.text }}
+                      theme={{
+                        colors: {
+                          primary: theme.colors.primary,
+                          background: 'transparent',
+                          text: theme.colors.text,
+                          placeholder: theme.colors.placeholder,
+                          outline: theme.colors.border,
+                        }
+                      }}
+                    />
+
+                    <TextInput
+                      label="Occupation (Job/Student)"
+                      value={occupation}
+                      onChangeText={setOccupation}
+                      mode="outlined"
+                      placeholder="e.g., Software Engineer, Student"
+                      style={styles.input}
+                      contentStyle={{ color: theme.colors.text }}
+                      theme={{
+                        colors: {
+                          primary: theme.colors.primary,
+                          background: 'transparent',
+                          text: theme.colors.text,
+                          placeholder: theme.colors.placeholder,
+                          outline: theme.colors.border,
+                        }
+                      }}
+                    />
+
+                    <TextInput
+                      label="State"
+                      value={state}
+                      onChangeText={setState}
+                      mode="outlined"
+                      autoCapitalize="characters"
+                      style={styles.input}
+                      contentStyle={{ color: theme.colors.text }}
+                      theme={{
+                        colors: {
+                          primary: theme.colors.primary,
+                          background: 'transparent',
+                          text: theme.colors.text,
+                          placeholder: theme.colors.placeholder,
+                          outline: theme.colors.border,
+                        }
+                      }}
+                    />
+                  </>
+                )}
               </View>
 
               <Button

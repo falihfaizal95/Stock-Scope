@@ -70,43 +70,46 @@ export default function NewsScreen() {
         </Text>
       </View>
 
-      {news.map((article, index) => (
-        <TouchableOpacity
-          key={index}
-          style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('NewsDetail', { article })}
-        >
-          {article.imageUrl && (
-            <Image
-              source={{ uri: article.imageUrl }}
-              style={styles.newsImage}
-              resizeMode="cover"
-            />
-          )}
-          <View style={styles.newsContent}>
-            <Text style={[styles.newsTitle, { color: theme.colors.text }]} numberOfLines={3}>
-              {article.title}
-            </Text>
-            {article.description && (
-              <Text style={[styles.newsDescription, { color: theme.colors.placeholder }]} numberOfLines={2}>
-                {article.description}
-              </Text>
+      <View style={styles.newsGrid}>
+        {news.map((article, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('NewsDetail', { article })}
+          >
+            {article.imageUrl ? (
+              <Image
+                source={{ uri: article.imageUrl }}
+                style={styles.newsImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.newsImagePlaceholder, { backgroundColor: theme.colors.border }]}>
+                <Text style={[styles.placeholderText, { color: theme.colors.placeholder }]}>
+                  {article.source?.charAt(0) || 'N'}
+                </Text>
+              </View>
             )}
-            <View style={styles.newsMeta}>
-              <Text style={[styles.newsSource, { color: theme.colors.primary }]}>
-                {article.source}
+            <View style={styles.newsContent}>
+              <Text style={[styles.newsTitle, { color: theme.colors.text }]} numberOfLines={3}>
+                {article.title}
               </Text>
-              <Text style={[styles.newsDate, { color: theme.colors.placeholder }]}>
-                {new Date(article.publishedAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
+              <View style={styles.newsMeta}>
+                <Text style={[styles.newsSource, { color: theme.colors.primary }]} numberOfLines={1}>
+                  {article.source}
+                </Text>
+                <Text style={[styles.newsDate, { color: theme.colors.placeholder }]}>
+                  {new Date(article.publishedAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -138,9 +141,16 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
   },
+  newsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+  },
   newsCard: {
-    marginHorizontal: 16,
-    marginBottom: 20,
+    width: (screenWidth - 48) / 2,
+    marginBottom: 16,
+    marginHorizontal: 6,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -151,34 +161,42 @@ const styles = StyleSheet.create({
   },
   newsImage: {
     width: '100%',
-    height: 200,
+    height: 150,
     backgroundColor: '#2c2c2e',
   },
+  newsImagePlaceholder: {
+    width: '100%',
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
   newsContent: {
-    padding: 16,
+    padding: 12,
+    minHeight: 100,
   },
   newsTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
-    lineHeight: 24,
-  },
-  newsDescription: {
-    fontSize: 14,
     lineHeight: 20,
-    marginBottom: 12,
   },
   newsMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 'auto',
   },
   newsSource: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
+    flex: 1,
   },
   newsDate: {
-    fontSize: 13,
+    fontSize: 11,
   },
   bottomPadding: {
     height: 20,

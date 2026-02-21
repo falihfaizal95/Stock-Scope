@@ -102,6 +102,22 @@ function HomeTabs() {
           tabBarLabel: 'Profile',
         }}
       />
+      <Tab.Screen 
+        name="StockDetail" 
+        component={StockDetailScreen}
+        options={{
+          tabBarLabel: 'Stock',
+          tabBarButton: () => null, // Hide from tab bar but keep in navigator
+        }}
+      />
+      <Tab.Screen 
+        name="NewsDetail" 
+        component={NewsDetailScreen}
+        options={{
+          tabBarLabel: 'Article',
+          tabBarButton: () => null, // Hide from tab bar but keep in navigator
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -119,28 +135,6 @@ export default function MainNavigator() {
       {user ? (
         <>
           <Stack.Screen name="MainTabs" component={HomeTabs} />
-          <Stack.Screen 
-            name="StockDetail" 
-            component={StockDetailScreen}
-            options={{ 
-              headerShown: true, 
-              title: 'Stock Details',
-              headerStyle: { backgroundColor: '#1c1c1e' },
-              headerTintColor: '#ffffff',
-              headerTitleStyle: { fontWeight: '700' },
-            }}
-          />
-          <Stack.Screen 
-            name="NewsDetail" 
-            component={NewsDetailScreen}
-            options={{ 
-              headerShown: true, 
-              title: 'News Article',
-              headerStyle: { backgroundColor: '#1c1c1e' },
-              headerTintColor: '#ffffff',
-              headerTitleStyle: { fontWeight: '700' },
-            }}
-          />
         </>
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} />

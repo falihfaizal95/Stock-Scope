@@ -7,7 +7,8 @@ import {
   GoogleAuthProvider,
   signInWithCredential
 } from 'firebase/auth';
-import { auth } from '../utils/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../utils/firebase';
 
 // 🚀 DEMO MODE: Set to true to bypass Firebase authentication
 const DEMO_MODE = false;
@@ -24,6 +25,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,11 +36,30 @@ export const AuthProvider = ({ children }) => {
         email: 'demo@stockscope.app',
         emailVerified: true
       });
+      setUserProfile({
+        fullName: 'Demo User',
+        birthday: '01/01/1990',
+        occupation: 'Student',
+        state: 'CA'
+      });
       setLoading(false);
     } else {
       // Production mode: Use Firebase
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
         setUser(user);
+        if (user) {
+          // Fetch user profile from Firestore
+          try {
+            const profileDoc = await getDoc(doc(db, 'users', user.uid));
+            if (profileDoc.exists()) {
+              setUserProfile(profileDoc.data());
+            }
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+        } else {
+          setUserProfile(null);
+        }
         setLoading(false);
       });
 
@@ -65,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signUp = async (email, password) => {
+  const signUp = async (email, password, profileData = {}) => {
     if (DEMO_MODE) {
       // Demo mode: Accept any credentials
       setUser({
@@ -73,11 +94,32 @@ export const AuthProvider = ({ children }) => {
         email: email || 'demo@stockscope.app',
         emailVerified: true
       });
+      setUserProfile(profileData);
       return { success: true };
     }
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Save user profile to Firestore
+      if (userCredential.user) {
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: email,
+          fullName: profileData.fullName || '',
+          birthday: profileData.birthday || '',
+          occupation: profileData.occupation || '',
+          state: profileData.state || '',
+          createdAt: new Date().toISOString(),
+          profilePicture: null,
+        });
+        setUserProfile({
+          fullName: profileData.fullName || '',
+          birthday: profileData.birthday || '',
+          occupation: profileData.occupation || '',
+          state: profileData.state || '',
+        });
+      }
+      
       return { success: true, user: userCredential.user };
     } catch (error) {
       return { success: false, error: error.message };
@@ -99,12 +141,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfile = async (updates) => {
+    if (!user) return { success: false, error: 'No user logged in' };
+    
+    try {
+      await setDoc(doc(db, 'users', user.uid), updates, { merge: true });
+      setUserProfile({ ...userProfile, ...updates });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const value = {
     user,
+    userProfile,
     loading,
     signIn,
     signUp,
     signOut,
+    updateProfile,
   };
 
   return (

@@ -37,16 +37,48 @@ app.get('/api/stock/search', async (req, res) => {
       return res.json(cached);
     }
 
-    // Using Finnhub for search
+    // Using Finnhub for search - increase results and include more types
     const response = await axios.get(
       `https://finnhub.io/api/v1/search?q=${q}&token=${FINNHUB_API_KEY}`
     );
 
-    const results = response.data.result.slice(0, 10).map((stock) => ({
-      symbol: stock.symbol,
-      name: stock.description,
-      type: stock.type,
-    }));
+    // Filter to include stocks, ETFs, and other securities
+    const allResults = response.data.result
+      .filter((item) => 
+        item.type === 'Common Stock' || 
+        item.type === 'ETF' || 
+        item.type === 'ETP' ||
+        item.type === 'REIT' ||
+        item.type === 'ADR'
+      )
+      .slice(0, 50); // Return up to 50 results
+
+    // Get additional data for each result
+    const results = await Promise.all(
+      allResults.map(async (stock) => {
+        try {
+          const [quoteResponse, profileResponse] = await Promise.all([
+            axios.get(`https://finnhub.io/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_API_KEY}`).catch(() => ({ data: {} })),
+            axios.get(`https://finnhub.io/api/v1/stock/profile2?symbol=${stock.symbol}&token=${FINNHUB_API_KEY}`).catch(() => ({ data: {} }))
+          ]);
+          
+          return {
+            symbol: stock.symbol,
+            name: stock.description || profileResponse.data.name || stock.symbol,
+            type: stock.type,
+            price: quoteResponse.data.c,
+            changePercent: quoteResponse.data.dp,
+            logo: profileResponse.data.logo,
+          };
+        } catch (error) {
+          return {
+            symbol: stock.symbol,
+            name: stock.description || stock.symbol,
+            type: stock.type,
+          };
+        }
+      })
+    );
 
     setCachedData(cacheKey, results);
     res.json(results);

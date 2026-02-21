@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Button,
 } from 'react-native-paper';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { stockAPI, newsAPI } from '../utils/api';
 import { useWatchlist } from '../context/WatchlistContext';
@@ -22,6 +22,7 @@ const screenWidth = Dimensions.get('window').width;
 
 export default function StockDetailScreen() {
   const route = useRoute();
+  const navigation = useNavigation();
   const { symbol } = route.params;
   const [stock, setStock] = useState(null);
   const [news, setNews] = useState([]);
@@ -101,6 +102,16 @@ export default function StockDetailScreen() {
 
   const chartData = generateChartData();
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      title: symbol,
+      headerStyle: { backgroundColor: '#1c1c1e' },
+      headerTintColor: '#ffffff',
+      headerTitleStyle: { fontWeight: '700' },
+    });
+  }, [navigation, symbol]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
