@@ -37,48 +37,81 @@ export default function HomeScreen() {
 
   const fetchData = async () => {
     try {
-      const [overview, gainers, losers, cryptoData] = await Promise.all([
-        stockAPI.getMarketOverview(),
-        stockAPI.getTopGainers(),
-        stockAPI.getTopLosers(),
-        stockAPI.getCrypto(),
-      ]);
+      // Fetch data with individual error handling
+      let overview = null;
+      let gainers = [];
+      let losers = [];
+      let cryptoData = [];
+
+      try {
+        overview = await stockAPI.getMarketOverview();
+      } catch (error) {
+        console.error('Error fetching overview:', error);
+      }
+
+      try {
+        gainers = await stockAPI.getTopGainers() || [];
+      } catch (error) {
+        console.error('Error fetching gainers:', error);
+      }
+
+      try {
+        losers = await stockAPI.getTopLosers() || [];
+      } catch (error) {
+        console.error('Error fetching losers:', error);
+      }
+
+      try {
+        cryptoData = await stockAPI.getCrypto() || [];
+      } catch (error) {
+        console.error('Error fetching crypto:', error);
+      }
+
       setMarketData(overview);
       
       // Combine S&P 500 and NASDAQ with gainers/losers
       const allStocks = [];
       
       // Add S&P 500 and NASDAQ as stock cards
-      if (overview) {
+      if (overview && overview.sp500 !== undefined) {
         allStocks.push({
           symbol: 'SPY',
           name: 'S&P 500',
           price: overview.sp500,
-          changePercent: overview.sp500Change,
+          changePercent: overview.sp500Change || 0,
           logo: null,
         });
         allStocks.push({
           symbol: 'QQQ',
           name: 'NASDAQ',
           price: overview.nasdaq,
-          changePercent: overview.nasdaqChange,
+          changePercent: overview.nasdaqChange || 0,
           logo: null,
         });
       }
       
-      // Add top gainers
-      allStocks.push(...gainers.slice(0, 10));
-      // Add top losers
-      allStocks.push(...losers.slice(0, 10));
+      // Add top gainers (filter out invalid entries)
+      if (Array.isArray(gainers)) {
+        allStocks.push(...gainers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 10));
+      }
+      
+      // Add top losers (filter out invalid entries)
+      if (Array.isArray(losers)) {
+        allStocks.push(...losers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 10));
+      }
       
       // Sort all stocks by change percentage (gainers first)
       allStocks.sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0));
       
-      setTopGainers(allStocks.filter(s => s.changePercent >= 0));
-      setTopLosers(allStocks.filter(s => s.changePercent < 0));
-      setCrypto(cryptoData || []);
+      setTopGainers(allStocks.filter(s => s && s.changePercent >= 0));
+      setTopLosers(allStocks.filter(s => s && s.changePercent < 0));
+      setCrypto(Array.isArray(cryptoData) ? cryptoData : []);
     } catch (error) {
       console.error('Error fetching market data:', error);
+      // Set empty arrays on error so UI still renders
+      setTopGainers([]);
+      setTopLosers([]);
+      setCrypto([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -292,23 +325,27 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Top Gainers
-        </Text>
-        <View style={styles.stockGrid}>
-          {topGainers.map((stock, index) => renderStockCard(stock, index))}
+      {topGainers.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Top Gainers
+          </Text>
+          <View style={styles.stockGrid}>
+            {topGainers.map((stock, index) => renderStockCard(stock, index))}
+          </View>
         </View>
-      </View>
+      )}
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Top Losers
-        </Text>
-        <View style={styles.stockGrid}>
-          {topLosers.map((stock, index) => renderStockCard(stock, index))}
+      {topLosers.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Top Losers
+          </Text>
+          <View style={styles.stockGrid}>
+            {topLosers.map((stock, index) => renderStockCard(stock, index))}
+          </View>
         </View>
-      </View>
+      )}
 
       {crypto.length > 0 && (
         <View style={styles.section}>
