@@ -154,7 +154,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           
-          <View style={styles.chartContainer}>
+          <View style={[styles.chartContainer, { width: cardWidth - 32, height: 50 }]}>
             <LineChart
               data={{
                 labels: ['', '', '', '', '', '', '', '', '', ''],
@@ -181,6 +181,7 @@ export default function HomeScreen() {
                 decimalPlaces: 0,
                 color: () => chartColor,
                 labelColor: () => 'transparent',
+                strokeWidth: 2,
                 style: {
                   borderRadius: 0,
                 },
@@ -193,9 +194,12 @@ export default function HomeScreen() {
               }}
               bezier
               style={{
-                marginVertical: 8,
+                marginVertical: 0,
                 borderRadius: 0,
+                paddingRight: 0,
+                paddingLeft: 0,
               }}
+              fromZero={false}
             />
           </View>
 
@@ -552,11 +556,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   chartContainer: {
-    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    height: 50,
+    overflow: 'hidden',
+    borderRadius: 4,
   },
   stockPriceRow: {
     width: '100%',

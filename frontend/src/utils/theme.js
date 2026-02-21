@@ -1,4 +1,5 @@
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import { fontFamily } from './fonts';
 
 // Apple Stocks-inspired Dark Theme
 export const darkTheme = {
@@ -20,6 +21,61 @@ export const darkTheme = {
     negative: '#ff3b30',
     placeholder: '#8e8e93',
     backdrop: 'rgba(0, 0, 0, 0.5)',
+  },
+  fonts: {
+    ...MD3DarkTheme.fonts,
+    default: {
+      ...MD3DarkTheme.fonts.default,
+      fontFamily: fontFamily.regular,
+    },
+    headlineSmall: {
+      ...MD3DarkTheme.fonts.headlineSmall,
+      fontFamily: fontFamily.bold,
+    },
+    headlineMedium: {
+      ...MD3DarkTheme.fonts.headlineMedium,
+      fontFamily: fontFamily.bold,
+    },
+    headlineLarge: {
+      ...MD3DarkTheme.fonts.headlineLarge,
+      fontFamily: fontFamily.bold,
+    },
+    titleSmall: {
+      ...MD3DarkTheme.fonts.titleSmall,
+      fontFamily: fontFamily.medium,
+    },
+    titleMedium: {
+      ...MD3DarkTheme.fonts.titleMedium,
+      fontFamily: fontFamily.medium,
+    },
+    titleLarge: {
+      ...MD3DarkTheme.fonts.titleLarge,
+      fontFamily: fontFamily.bold,
+    },
+    bodySmall: {
+      ...MD3DarkTheme.fonts.bodySmall,
+      fontFamily: fontFamily.regular,
+    },
+    bodyMedium: {
+      ...MD3DarkTheme.fonts.bodyMedium,
+      fontFamily: fontFamily.regular,
+    },
+    bodyLarge: {
+      ...MD3DarkTheme.fonts.bodyLarge,
+      fontFamily: fontFamily.regular,
+    },
+    labelSmall: {
+      ...MD3DarkTheme.fonts.labelSmall,
+      fontFamily: fontFamily.medium,
+    },
+    labelMedium: {
+      ...MD3DarkTheme.fonts.labelMedium,
+      fontFamily: fontFamily.medium,
+    },
+    labelLarge: {
+      ...MD3DarkTheme.fonts.labelLarge,
+      fontFamily: fontFamily.medium,
+    },
   },
 };
 

@@ -20,9 +20,15 @@ export const stockAPI = {
   getStockDetails: async (symbol) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/stock/${symbol}`);
+      if (response.data && response.data.error) {
+        throw new Error(response.data.error);
+      }
       return response.data;
     } catch (error) {
       console.error('Stock details error:', error);
+      if (error.response && error.response.status === 404) {
+        throw new Error('Stock not found');
+      }
       throw error;
     }
   },

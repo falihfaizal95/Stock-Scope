@@ -12,6 +12,8 @@ import { theme } from './src/utils/theme';
 // Import web-specific styles
 if (Platform.OS === 'web') {
   require('./src/navigation/tabStyles.css');
+  const { applyGlobalFonts } = require('./src/styles/globalStyles');
+  applyGlobalFonts();
 }
 
 export default function App() {

@@ -39,15 +39,29 @@ export default function StockDetailScreen() {
 
   const fetchStockDetails = async () => {
     setLoading(true);
+    setStock(null);
     try {
-      const [stockData, newsData] = await Promise.all([
-        stockAPI.getStockDetails(symbol),
-        newsAPI.getStockNews(symbol),
-      ]);
-      setStock(stockData);
-      setNews(newsData.slice(0, 5));
+      const stockData = await stockAPI.getStockDetails(symbol);
+      if (stockData && stockData.error) {
+        console.error('Stock API error:', stockData.error);
+        setStock(null);
+      } else if (stockData && stockData.price !== undefined) {
+        setStock(stockData);
+        // Fetch news separately to not block on error
+        try {
+          const newsData = await newsAPI.getStockNews(symbol);
+          setNews(newsData.slice(0, 5));
+        } catch (newsError) {
+          console.error('News error:', newsError);
+          setNews([]);
+        }
+      } else {
+        console.error('Invalid stock data:', stockData);
+        setStock(null);
+      }
     } catch (error) {
       console.error('Error fetching stock details:', error);
+      setStock(null);
     } finally {
       setLoading(false);
     }
@@ -174,49 +188,59 @@ export default function StockDetailScreen() {
             Expand Chart
           </Button>
         </View>
-        <LineChart
-          data={{
-            labels: ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-            datasets: [
-              {
-                data: chartData,
-                color: () => chartColor,
-                strokeWidth: 3,
+        <View style={styles.chartWrapper}>
+          <LineChart
+            data={{
+              labels: ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+              datasets: [
+                {
+                  data: chartData,
+                  color: () => chartColor,
+                  strokeWidth: 2.5,
+                },
+              ],
+            }}
+            width={screenWidth - 64}
+            height={200}
+            withDots={false}
+            withShadow={false}
+            withVerticalLines={true}
+            withHorizontalLines={true}
+            withInnerLines={true}
+            withOuterLines={true}
+            chartConfig={{
+              backgroundColor: theme.colors.surface,
+              backgroundGradientFrom: theme.colors.surface,
+              backgroundGradientTo: theme.colors.surface,
+              decimalPlaces: 2,
+              color: () => chartColor,
+              labelColor: () => theme.colors.placeholder,
+              strokeWidth: 2,
+              barPercentage: 1,
+              useShadowColorFromDataset: false,
+              style: {
+                borderRadius: 0,
               },
-            ],
-          }}
-          width={screenWidth - 32}
-          height={220}
-          withDots={false}
-          withShadow={false}
-          withVerticalLines={false}
-          withHorizontalLines={true}
-          withInnerLines={false}
-          withOuterLines={false}
-          chartConfig={{
-            backgroundColor: 'transparent',
-            backgroundGradientFrom: 'transparent',
-            backgroundGradientTo: 'transparent',
-            decimalPlaces: 0,
-            color: () => chartColor,
-            labelColor: () => theme.colors.placeholder,
-            style: {
+              propsForBackgroundLines: {
+                strokeWidth: 1,
+                stroke: theme.colors.border,
+                strokeDasharray: '0',
+              },
+              propsForDots: {
+                r: '0',
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 0,
               borderRadius: 0,
-            },
-            propsForBackgroundLines: {
-              strokeWidth: 0.5,
-              stroke: theme.colors.border,
-            },
-            propsForDots: {
-              r: '0',
-            },
-          }}
-          bezier
-          style={{
-            marginVertical: 8,
-            borderRadius: 0,
-          }}
-        />
+              paddingRight: 0,
+              paddingLeft: 0,
+            }}
+            fromZero={false}
+            segments={4}
+          />
+        </View>
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -324,6 +348,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     padding: 20,
+    overflow: 'hidden',
+  },
+  chartWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    overflow: 'hidden',
   },
   chartHeader: {
     flexDirection: 'row',
