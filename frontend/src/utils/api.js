@@ -34,6 +34,26 @@ export const stockAPI = {
     }
   },
 
+  getRelatedStocks: async (symbol) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/stock/${symbol}/related`);
+      return response.data;
+    } catch (error) {
+      console.error('Related stocks error:', error);
+      return [];
+    }
+  },
+
+  getStockEarnings: async (symbol) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/stock/${symbol}/earnings`);
+      return response.data;
+    } catch (error) {
+      console.error('Stock earnings error:', error);
+      return [];
+    }
+  },
+
   // Get market overview
   getMarketOverview: async () => {
     try {
@@ -113,5 +133,4 @@ export const newsAPI = {
     }
   },
 };
-
 

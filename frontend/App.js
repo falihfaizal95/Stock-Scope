@@ -7,7 +7,7 @@ import MainNavigator from './src/navigation/MainNavigator';
 import { AuthProvider } from './src/context/AuthContext';
 import { WatchlistProvider } from './src/context/WatchlistContext';
 import { PortfolioProvider } from './src/context/PortfolioContext';
-import { theme } from './src/utils/theme';
+import { ThemeModeProvider, useThemeMode } from './src/context/ThemeModeContext';
 
 // Import web-specific styles
 if (Platform.OS === 'web') {
@@ -16,7 +16,9 @@ if (Platform.OS === 'web') {
   applyGlobalFonts();
 }
 
-export default function App() {
+function AppContent() {
+  const { theme, isDarkMode } = useThemeMode();
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
@@ -25,7 +27,7 @@ export default function App() {
             <PortfolioProvider>
               <NavigationContainer
               theme={{
-                dark: true,
+                dark: isDarkMode,
                 colors: {
                   primary: theme.colors.primary,
                   background: theme.colors.background,
@@ -37,7 +39,7 @@ export default function App() {
               }}
             >
               <StatusBar
-                barStyle="light-content"
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
                 backgroundColor={theme.colors.background}
               />
               <MainNavigator />
@@ -50,3 +52,10 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <ThemeModeProvider>
+      <AppContent />
+    </ThemeModeProvider>
+  );
+}

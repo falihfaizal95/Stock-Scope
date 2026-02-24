@@ -39,6 +39,8 @@ const buildFinnhubQuoteUrl = (symbol) =>
 
 const buildFinnhubProfileUrl = (symbol) =>
   `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
+const buildFinnhubMetricUrl = (symbol) =>
+  `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${FINNHUB_API_KEY}`;
 
 const getCachedProfileForSymbol = async (symbol) => {
   const cacheKey = `profile_${symbol}`;
@@ -221,6 +223,80 @@ app.get('/api/stock/search', async (req, res) => {
 });
 
 // Get stock details
+app.get('/api/stock/:symbol/related', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const cacheKey = `related_${symbol}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const peersResponse = await axios.get(
+      `https://finnhub.io/api/v1/stock/peers?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`
+    );
+
+    const peers = Array.isArray(peersResponse.data) ? peersResponse.data.slice(0, 8) : [];
+    const related = await Promise.all(
+      peers.map(async (peerSymbol) => {
+        try {
+          const [quoteResponse, profileResponse] = await Promise.all([
+            axios.get(buildFinnhubQuoteUrl(peerSymbol)),
+            axios.get(buildFinnhubProfileUrl(peerSymbol)).catch(() => ({ data: {} })),
+          ]);
+          return {
+            symbol: peerSymbol,
+            name: profileResponse.data?.name || peerSymbol,
+            logo: profileResponse.data?.logo || null,
+            price: quoteResponse.data?.c,
+            changePercent: quoteResponse.data?.dp,
+            source: 'peer-comparison',
+          };
+        } catch (error) {
+          return { symbol: peerSymbol, name: peerSymbol, source: 'peer-comparison' };
+        }
+      })
+    );
+
+    setCachedData(cacheKey, related);
+    res.json(related);
+  } catch (error) {
+    console.error('Related stocks error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch related stocks' });
+  }
+});
+
+app.get('/api/stock/:symbol/earnings', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const cacheKey = `earnings_${symbol}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const response = await axios.get(
+      `https://finnhub.io/api/v1/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`
+    );
+
+    const earnings = (Array.isArray(response.data) ? response.data : []).slice(0, 8).map((item) => ({
+      period: item.period,
+      actual: item.actual,
+      estimate: item.estimate,
+      surprise: item.surprise,
+      surprisePercent: item.surprisePercent,
+      quarter: item.quarter,
+      year: item.year,
+    }));
+
+    setCachedData(cacheKey, earnings);
+    res.json(earnings);
+  } catch (error) {
+    console.error('Earnings error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch earnings reports' });
+  }
+});
+
 app.get('/api/stock/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
@@ -232,7 +308,7 @@ app.get('/api/stock/:symbol', async (req, res) => {
     }
 
     // Get quote - handle errors gracefully
-    let quoteResponse, profileResponse;
+    let quoteResponse, profileResponse, metricResponse;
     let isCryptoAsset = false;
     const normalizedSymbol = String(symbol || '').toUpperCase();
     const cryptoQuoteSymbol = `BINANCE:${normalizedSymbol}USDT`;
@@ -281,8 +357,19 @@ app.get('/api/stock/:symbol', async (req, res) => {
       profileResponse = { data: {} };
     }
 
+    if (!isCryptoAsset) {
+      try {
+        metricResponse = await axios.get(buildFinnhubMetricUrl(symbol));
+      } catch (error) {
+        metricResponse = { data: { metric: {} } };
+      }
+    } else {
+      metricResponse = { data: { metric: {} } };
+    }
+
     const quote = quoteResponse.data;
     const profile = profileResponse.data || {};
+    const metric = metricResponse?.data?.metric || {};
 
     // Validate quote data
     if ((!quote || quote.c === undefined || quote.c === null) && CRYPTO_SYMBOLS.has(normalizedSymbol) && !isCryptoAsset) {
@@ -331,6 +418,12 @@ app.get('/api/stock/:symbol', async (req, res) => {
       marketCap: profile.marketCapitalization,
       week52High: profile.week52High,
       week52Low: profile.week52Low,
+      peRatio: metric.peBasicExclExtraTTM ?? metric.peTTM ?? null,
+      dividendYield: metric.dividendYieldIndicatedAnnual ?? metric.dividendYield5YAvg ?? null,
+      avgVolume: metric['10DayAverageTradingVolume'] ?? metric['3MonthAverageTradingVolume'] ?? null,
+      sharesOutstanding: metric.shareOutstandingBasic ?? null,
+      beta: metric.beta ?? null,
+      epsTTM: metric.epsBasicExclExtraItemsTTM ?? metric.epsTTM ?? null,
       logo: profile.logo,
       exchange: profile.exchange,
       industry: profile.finnhubIndustry,

@@ -4,6 +4,8 @@ import { db } from '../utils/firebase';
 import { useAuth } from './AuthContext';
 
 const PortfolioContext = createContext({});
+const STARTING_CASH = 1000000;
+const getPortfolioFallbackKey = (uid) => `portfolio_fallback_${uid}`;
 
 export const usePortfolio = () => {
   const context = useContext(PortfolioContext);
@@ -16,9 +18,9 @@ export const usePortfolio = () => {
 export const PortfolioProvider = ({ children }) => {
   const { user } = useAuth();
   const [portfolio, setPortfolio] = useState({
-    cash: 100000, // Starting fake money: $100,000
+    cash: STARTING_CASH, // Starting fake money: $1,000,000
     holdings: [],
-    totalValue: 100000,
+    totalValue: STARTING_CASH,
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,17 +40,29 @@ export const PortfolioProvider = ({ children }) => {
       if (portfolioDoc.exists()) {
         setPortfolio(portfolioDoc.data());
       } else {
-        // Initialize portfolio with $100,000 fake money
+        // Initialize portfolio with $1,000,000 fake money
         const initialPortfolio = {
-          cash: 100000,
+          cash: STARTING_CASH,
           holdings: [],
-          totalValue: 100000,
+          totalValue: STARTING_CASH,
         };
         await setDoc(doc(db, 'portfolios', user.uid), initialPortfolio);
         setPortfolio(initialPortfolio);
       }
     } catch (error) {
       console.error('Error loading portfolio:', error);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const fallback = localStorage.getItem(getPortfolioFallbackKey(user.uid));
+          if (fallback) {
+            setPortfolio(JSON.parse(fallback));
+          } else {
+            setPortfolio({ cash: STARTING_CASH, holdings: [], totalValue: STARTING_CASH });
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Error loading local portfolio fallback:', fallbackError);
+      }
     } finally {
       setLoading(false);
     }
@@ -84,6 +98,7 @@ export const PortfolioProvider = ({ children }) => {
         ...portfolio,
         cash: portfolio.cash - totalCost,
         holdings: updatedHoldings,
+        totalValue: portfolio.totalValue,
       };
 
       await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
@@ -92,7 +107,26 @@ export const PortfolioProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Error buying stock:', error);
-      return { success: false, error: error.message };
+      try {
+        const updatedHoldings = [...portfolio.holdings];
+        const existingHolding = updatedHoldings.find(h => h.symbol === symbol);
+        if (existingHolding) {
+          const newShares = existingHolding.shares + shares;
+          const avgPrice = ((existingHolding.shares * existingHolding.avgPrice) + totalCost) / newShares;
+          existingHolding.shares = newShares;
+          existingHolding.avgPrice = avgPrice;
+        } else {
+          updatedHoldings.push({ symbol, shares, avgPrice: price, purchaseDate: new Date().toISOString() });
+        }
+        const updatedPortfolio = { ...portfolio, cash: portfolio.cash - totalCost, holdings: updatedHoldings };
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
+        }
+        setPortfolio(updatedPortfolio);
+        return { success: true, localOnly: true };
+      } catch (fallbackError) {
+        return { success: false, error: error.message || fallbackError.message };
+      }
     }
   };
 
@@ -119,6 +153,7 @@ export const PortfolioProvider = ({ children }) => {
         ...portfolio,
         cash: portfolio.cash + proceeds,
         holdings: updatedHoldings,
+        totalValue: portfolio.totalValue,
       };
 
       await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
@@ -127,7 +162,26 @@ export const PortfolioProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.error('Error selling stock:', error);
-      return { success: false, error: error.message };
+      try {
+        const updatedHoldings = [...portfolio.holdings];
+        const holdingIndex = updatedHoldings.findIndex(h => h.symbol === symbol);
+        if (holdingIndex === -1 || updatedHoldings[holdingIndex].shares < shares) {
+          return { success: false, error: 'Insufficient shares' };
+        }
+        if (updatedHoldings[holdingIndex].shares === shares) {
+          updatedHoldings.splice(holdingIndex, 1);
+        } else {
+          updatedHoldings[holdingIndex].shares -= shares;
+        }
+        const updatedPortfolio = { ...portfolio, cash: portfolio.cash + proceeds, holdings: updatedHoldings };
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
+        }
+        setPortfolio(updatedPortfolio);
+        return { success: true, localOnly: true };
+      } catch (fallbackError) {
+        return { success: false, error: error.message || fallbackError.message };
+      }
     }
   };
 

@@ -10,13 +10,18 @@ import {
 import { Text, Button, Divider } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useWatchlist } from '../context/WatchlistContext';
+import { usePortfolio } from '../context/PortfolioContext';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from 'react-native-paper';
+import { Switch } from 'react-native-paper';
+import { useThemeMode } from '../context/ThemeModeContext';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const { user, userProfile, signOut, updateProfile } = useAuth();
   const { watchlist } = useWatchlist();
+  const { portfolio } = usePortfolio();
+  const { isDarkMode, toggleThemeMode } = useThemeMode();
   const navigation = useNavigation();
   const theme = useTheme();
   const [uploading, setUploading] = useState(false);
@@ -85,13 +90,61 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          Paper Trading Portfolio
+        </Text>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Cash</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+            ${(portfolio?.cash || 0).toFixed(2)}
+          </Text>
+        </View>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Holdings</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+            {portfolio?.holdings?.length || 0}
+          </Text>
+        </View>
+      </View>
+
+      {portfolio?.holdings?.length > 0 && (
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            Your Holdings ({portfolio.holdings.length})
+          </Text>
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+          {portfolio.holdings.map((item, index) => (
+            <TouchableOpacity
+              key={`${item.symbol}-${index}`}
+              onPress={() => navigation.navigate('StockDetail', { symbol: item.symbol })}
+              style={styles.holdingItem}
+            >
+              <View style={styles.holdingInfo}>
+                <Text style={[styles.holdingSymbol, { color: theme.colors.text }]}>
+                  {item.symbol}
+                </Text>
+                <Text style={[styles.holdingName, { color: theme.colors.placeholder }]}>
+                  {item.shares} shares @ ${Number(item.avgPrice || 0).toFixed(2)}
+                </Text>
+              </View>
+              <Text style={[styles.holdingArrow, { color: theme.colors.placeholder }]}>
+                →
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {watchlist.length > 0 && (
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-            Your Holdings ({watchlist.length})
+            Watchlist ({watchlist.length})
           </Text>
           <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-          {watchlist.map((item) => (
+          {watchlist.slice(0, 6).map((item) => (
             <TouchableOpacity
               key={item.id}
               onPress={() => navigation.navigate('StockDetail', { symbol: item.symbol })}
@@ -102,7 +155,7 @@ export default function ProfileScreen() {
                   {item.symbol}
                 </Text>
                 <Text style={[styles.holdingName, { color: theme.colors.placeholder }]}>
-                  {item.name}
+                  Added {item.addedAt ? new Date(item.addedAt).toLocaleDateString() : 'recently'}
                 </Text>
               </View>
               <Text style={[styles.holdingArrow, { color: theme.colors.placeholder }]}>
@@ -177,6 +230,22 @@ export default function ProfileScreen() {
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>
             {user?.emailVerified ? 'Yes' : 'No'}
           </Text>
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          Settings
+        </Text>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
+          <View>
+            <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Dark Mode</Text>
+            <Text style={[styles.settingHelper, { color: theme.colors.placeholder }]}>
+              Toggle between light and dark appearance
+            </Text>
+          </View>
+          <Switch value={isDarkMode} onValueChange={toggleThemeMode} color={theme.colors.primary} />
         </View>
       </View>
 
@@ -305,6 +374,10 @@ const styles = StyleSheet.create({
   aboutText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  settingHelper: {
+    fontSize: 12,
+    marginTop: 4,
   },
   buttonContainer: {
     paddingHorizontal: 16,

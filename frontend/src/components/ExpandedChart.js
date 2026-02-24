@@ -69,6 +69,24 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
   const chartData = generateChartData(selectedTimeframe);
   const chartColor = stockData?.changePercent >= 0 ? theme.colors.positive : theme.colors.negative;
   const labels = Array(chartData.length).fill('');
+  const extraStats = [
+    ['Current Price', stockData?.price != null ? `$${stockData.price.toFixed(2)}` : 'N/A'],
+    ['Open', stockData?.open != null ? `$${stockData.open.toFixed(2)}` : 'N/A'],
+    ['High Today', stockData?.high != null ? `$${stockData.high.toFixed(2)}` : 'N/A'],
+    ['Low Today', stockData?.low != null ? `$${stockData.low.toFixed(2)}` : 'N/A'],
+    ['Prev Close', stockData?.previousClose != null ? `$${stockData.previousClose.toFixed(2)}` : 'N/A'],
+    ['Volume', typeof stockData?.volume === 'number' ? stockData.volume.toLocaleString() : 'N/A'],
+    ['Avg Volume', typeof stockData?.avgVolume === 'number' ? stockData.avgVolume.toLocaleString() : 'N/A'],
+    ['Market Cap', typeof stockData?.marketCap === 'number' ? `${stockData.marketCap.toFixed(2)}B` : 'N/A'],
+    ['P/E Ratio', typeof stockData?.peRatio === 'number' ? stockData.peRatio.toFixed(2) : 'N/A'],
+    ['Dividend Yield', typeof stockData?.dividendYield === 'number' ? `${stockData.dividendYield.toFixed(2)}%` : 'N/A'],
+    ['52W High', stockData?.week52High != null ? `$${stockData.week52High.toFixed(2)}` : 'N/A'],
+    ['52W Low', stockData?.week52Low != null ? `$${stockData.week52Low.toFixed(2)}` : 'N/A'],
+    ['Beta', typeof stockData?.beta === 'number' ? stockData.beta.toFixed(2) : 'N/A'],
+    ['EPS (TTM)', typeof stockData?.epsTTM === 'number' ? stockData.epsTTM.toFixed(2) : 'N/A'],
+    ['Exchange', stockData?.exchange || 'N/A'],
+    ['Industry', stockData?.industry || 'N/A'],
+  ];
 
   return (
     <Modal
@@ -210,28 +228,22 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
             </Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>
-                  High
-                </Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>High</Text>
                 <Text style={[styles.statValue, { color: theme.colors.text }]}>
                   ${Math.max(...chartData).toFixed(2)}
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>
-                  Low
-                </Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>Low</Text>
                 <Text style={[styles.statValue, { color: theme.colors.text }]}>
                   ${Math.min(...chartData).toFixed(2)}
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>
-                  Change
-                </Text>
+                <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>Change</Text>
                 <Text style={[
                   styles.statValue,
-                  { 
+                  {
                     color: chartData[chartData.length - 1] >= chartData[0]
                       ? theme.colors.positive
                       : theme.colors.negative
@@ -241,6 +253,16 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
                   ${(chartData[chartData.length - 1] - chartData[0]).toFixed(2)}
                 </Text>
               </View>
+            </View>
+            <View style={styles.extraStatsGrid}>
+              {extraStats.map(([label, value]) => (
+                <View key={label} style={styles.extraStatItem}>
+                  <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>{label}</Text>
+                  <Text style={[styles.extraStatValue, { color: theme.colors.text }]} numberOfLines={2}>
+                    {value}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
         </ScrollView>
@@ -328,6 +350,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 18,
   },
   statItem: {
     flex: 1,
@@ -340,5 +363,20 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  extraStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  extraStatItem: {
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  extraStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
   },
 });
