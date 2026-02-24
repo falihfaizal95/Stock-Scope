@@ -38,6 +38,16 @@ export default function StockDetailScreen() {
     fetchStockDetails();
   }, [symbol]);
 
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      title: symbol,
+      headerStyle: { backgroundColor: '#1c1c1e' },
+      headerTintColor: '#ffffff',
+      headerTitleStyle: { fontWeight: '700' },
+    });
+  }, [navigation, symbol]);
+
   const fetchStockDetails = async () => {
     setLoading(true);
     setStock(null);
@@ -120,16 +130,6 @@ export default function StockDetailScreen() {
 
   const chartData = generateChartData();
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
-
-  React.useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      title: symbol,
-      headerStyle: { backgroundColor: '#1c1c1e' },
-      headerTintColor: '#ffffff',
-      headerTitleStyle: { fontWeight: '700' },
-    });
-  }, [navigation, symbol]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
