@@ -39,6 +39,8 @@ export default function StockDetailScreen() {
   const [tradeShares, setTradeShares] = useState('');
   const [tradeSubmitting, setTradeSubmitting] = useState(false);
   const [tradeSuccessMessage, setTradeSuccessMessage] = useState('');
+  const [selectedChartRange, setSelectedChartRange] = useState('1D');
+  const [selectedEarningsReport, setSelectedEarningsReport] = useState(null);
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
   const { portfolio, buyStock, sellStock } = usePortfolio();
   const theme = useTheme();
@@ -200,21 +202,31 @@ export default function StockDetailScreen() {
 
   const isPositive = stock.changePercent >= 0;
 
-  // Generate chart data
-  const generateChartData = () => {
+  // Generate mock chart data per selected timeframe (placeholder until historical candles API is wired)
+  const generateChartData = (range) => {
     const data = [];
     const baseValue = stock.price || 150;
-    for (let i = 0; i < 20; i++) {
+    const pointsByRange = { '1D': 24, '1W': 20, '1M': 28, '3M': 36, 'YTD': 42, '1Y': 52, '5Y': 60, 'MAX': 72 };
+    const driftByRange = { '1D': 0.2, '1W': 0.35, '1M': 0.45, '3M': 0.6, 'YTD': 0.7, '1Y': 0.8, '5Y': 1.0, 'MAX': 1.15 };
+    const points = pointsByRange[range] || 24;
+    const drift = driftByRange[range] || 0.4;
+
+    for (let i = 0; i < points; i++) {
       const change = isPositive 
-        ? Math.random() * 10 
-        : -Math.random() * 10;
-      data.push(baseValue + change + (i * (isPositive ? 2 : -2)));
+        ? Math.random() * (4 + (points / 20))
+        : -Math.random() * (4 + (points / 20));
+      const trend = i * (isPositive ? drift : -drift);
+      data.push(baseValue + change + trend);
     }
     return data;
   };
 
-  const chartData = generateChartData();
+  const chartData = generateChartData(selectedChartRange);
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
+  const chartRanges = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
+  const aboutSummary = stock.industry
+    ? `${stock.name} operates in the ${stock.industry} industry and trades on ${stock.exchange || 'its primary exchange'}.`
+    : `${stock.name} trades on ${stock.exchange || 'its primary exchange'}.`;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -277,28 +289,25 @@ export default function StockDetailScreen() {
         </View>
       </View>
 
-      {/* Large Chart */}
       <View style={[styles.chartCard, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.chartHeader}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>
-            1 Day Chart
+        <View style={styles.appleChartTopMeta}>
+          <Text style={[styles.chartMetaLabel, { color: theme.colors.placeholder }]}>
+            {selectedChartRange === '1D' ? '24 Hour Market' : `${selectedChartRange} Market`}
           </Text>
           <Button
-            mode="contained"
+            mode="text"
             onPress={() => setChartExpanded(true)}
-            buttonColor={theme.colors.primary}
-            textColor="#000"
-            labelStyle={{ fontSize: 12, fontWeight: '600' }}
-            contentStyle={{ paddingHorizontal: 12, paddingVertical: 4 }}
-            style={styles.expandButton}
+            textColor={theme.colors.primary}
+            labelStyle={{ fontSize: 12, fontWeight: '700' }}
+            compact
           >
-            Expand Chart
+            Expand
           </Button>
         </View>
         <View style={styles.chartWrapper}>
           <LineChart
             data={{
-              labels: ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+              labels: Array(chartData.length).fill(''),
               datasets: [
                 {
                   data: chartData,
@@ -308,20 +317,20 @@ export default function StockDetailScreen() {
               ],
             }}
             width={screenWidth - 64}
-            height={200}
+            height={260}
             withDots={false}
             withShadow={false}
-            withVerticalLines={true}
-            withHorizontalLines={true}
-            withInnerLines={true}
-            withOuterLines={true}
+            withVerticalLines={false}
+            withHorizontalLines={false}
+            withInnerLines={false}
+            withOuterLines={false}
             chartConfig={{
               backgroundColor: theme.colors.surface,
               backgroundGradientFrom: theme.colors.surface,
               backgroundGradientTo: theme.colors.surface,
               decimalPlaces: 2,
               color: () => chartColor,
-              labelColor: () => theme.colors.placeholder,
+              labelColor: () => 'transparent',
               strokeWidth: 2,
               barPercentage: 1,
               useShadowColorFromDataset: false,
@@ -329,9 +338,7 @@ export default function StockDetailScreen() {
                 borderRadius: 0,
               },
               propsForBackgroundLines: {
-                strokeWidth: 1,
-                stroke: theme.colors.border,
-                strokeDasharray: '0',
+                strokeWidth: 0,
               },
               propsForDots: {
                 r: '0',
@@ -345,9 +352,32 @@ export default function StockDetailScreen() {
               paddingLeft: 0,
             }}
             fromZero={false}
-            segments={4}
+            segments={0}
           />
         </View>
+        <View style={[styles.chartDottedDivider, { borderBottomColor: theme.colors.border }]} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartRangeRow}>
+          {chartRanges.map((range) => {
+            const active = selectedChartRange === range;
+            return (
+              <TouchableOpacity
+                key={range}
+                onPress={() => setSelectedChartRange(range)}
+                style={styles.chartRangeButton}
+              >
+                <Text
+                  style={[
+                    styles.chartRangeText,
+                    { color: active ? theme.colors.primary : theme.colors.text },
+                  ]}
+                >
+                  {range}
+                </Text>
+                {active && <View style={[styles.chartRangeUnderline, { backgroundColor: theme.colors.primary }]} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -380,7 +410,7 @@ export default function StockDetailScreen() {
       {relatedStocks.length > 0 && (
         <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-            People who own {symbol} also own
+            People who own {symbol} also own:
           </Text>
           <Text style={[styles.cardSubtitle, { color: theme.colors.placeholder }]}>
             Based on comparable/peer stocks from market data.
@@ -442,11 +472,17 @@ export default function StockDetailScreen() {
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
             Earnings Reports
           </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.earningsCardsRow}>
           {earningsReports.map((report, index) => {
             const positiveSurprise = (report.surprisePercent || 0) >= 0;
             return (
-              <View key={`${report.period}-${index}`} style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.newsTitle, { color: theme.colors.text }]}>
+              <TouchableOpacity
+                key={`${report.period}-${index}`}
+                onPress={() => setSelectedEarningsReport(report)}
+                activeOpacity={0.85}
+                style={[styles.earningsCardHorizontal, { backgroundColor: theme.colors.surface }]}
+              >
+                <Text style={[styles.newsTitle, { color: theme.colors.text }]} numberOfLines={1}>
                   {report.period || `Q${report.quarter || ''} ${report.year || ''}`}
                 </Text>
                 <View style={styles.earningsGrid}>
@@ -468,11 +504,35 @@ export default function StockDetailScreen() {
                     </Text>
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
+          </ScrollView>
         </View>
       )}
+
+      <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>About</Text>
+        <Text style={[styles.aboutSummary, { color: theme.colors.text }]}>{aboutSummary}</Text>
+        <View style={styles.statsGrid}>
+          {[
+            ['Industry', stock.industry || 'N/A'],
+            ['Exchange', stock.exchange || 'N/A'],
+            ['Country', stock.country || 'N/A'],
+            ['IPO Date', stock.ipo || 'N/A'],
+            ['Currency', stock.currency || 'N/A'],
+            ['Shares Outstanding', formatNumber(stock.shareOutstanding)],
+          ].map(([label, value]) => (
+            <View key={label} style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.colors.placeholder }]}>{label}</Text>
+              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={2}>{value}</Text>
+            </View>
+          ))}
+        </View>
+        {stock.website ? (
+          <Text style={[styles.websiteText, { color: theme.colors.primary }]}>{stock.website}</Text>
+        ) : null}
+      </View>
 
       <View style={styles.bottomPadding} />
       
@@ -549,6 +609,30 @@ export default function StockDetailScreen() {
           <Text style={styles.tradeSuccessText}>{tradeSuccessMessage}</Text>
         </View>
       </Modal>
+
+      <Modal visible={!!selectedEarningsReport} animationType="slide" transparent={false} onRequestClose={() => setSelectedEarningsReport(null)}>
+        <View style={styles.tradeModalRoot}>
+          <View style={styles.tradeModalHeader}>
+            <Text style={styles.tradeModalTitle}>Earnings Report</Text>
+            <Button mode="text" onPress={() => setSelectedEarningsReport(null)} textColor="#111">Close</Button>
+          </View>
+          {selectedEarningsReport && (
+            <View style={styles.tradeInfoCard}>
+              <Text style={styles.tradeInfoLine}>Period: {selectedEarningsReport.period || 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>Quarter: {selectedEarningsReport.quarter || 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>Year: {selectedEarningsReport.year || 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>Actual EPS: {selectedEarningsReport.actual ?? 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>Estimated EPS: {selectedEarningsReport.estimate ?? 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>Surprise: {selectedEarningsReport.surprise ?? 'N/A'}</Text>
+              <Text style={styles.tradeInfoLine}>
+                Surprise %: {typeof selectedEarningsReport.surprisePercent === 'number'
+                  ? `${selectedEarningsReport.surprisePercent >= 0 ? '+' : ''}${selectedEarningsReport.surprisePercent.toFixed(2)}%`
+                  : 'N/A'}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -580,8 +664,8 @@ const styles = StyleSheet.create({
   chartCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     overflow: 'hidden',
   },
   chartWrapper: {
@@ -604,6 +688,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  appleChartTopMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  chartMetaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  chartDottedDivider: {
+    borderBottomWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  chartRangeRow: {
+    paddingTop: 2,
+    paddingRight: 8,
+  },
+  chartRangeButton: {
+    marginRight: 18,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  chartRangeText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  chartRangeUnderline: {
+    marginTop: 6,
+    width: 22,
+    height: 3,
+    borderRadius: 3,
+  },
   expandButton: {
     borderRadius: 8,
   },
@@ -623,14 +742,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   nameLarge: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: '800',
-    lineHeight: 34,
+    lineHeight: 40,
     marginBottom: 8,
   },
   priceUnderName: {
-    fontSize: 30,
-    fontWeight: '800',
+    fontSize: 26,
+    fontWeight: '700',
     marginBottom: 10,
   },
   priceContainer: {
@@ -738,19 +857,19 @@ const styles = StyleSheet.create({
     marginHorizontal: -4,
   },
   relatedChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
     margin: 4,
-    minWidth: 82,
+    minWidth: 110,
   },
   relatedChipText: {
-    fontSize: 13,
+    fontSize: 18,
     fontWeight: '700',
   },
   relatedChipPct: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 14,
+    marginTop: 4,
   },
   earningsGrid: {
     marginTop: 4,
@@ -758,6 +877,25 @@ const styles = StyleSheet.create({
   earningsItem: {
     fontSize: 13,
     marginBottom: 6,
+  },
+  earningsCardsRow: {
+    paddingRight: 10,
+  },
+  earningsCardHorizontal: {
+    width: 260,
+    marginRight: 12,
+    borderRadius: 14,
+    padding: 14,
+  },
+  aboutSummary: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  websiteText: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '700',
   },
   tradeModalRoot: {
     flex: 1,

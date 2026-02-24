@@ -427,6 +427,12 @@ app.get('/api/stock/:symbol', async (req, res) => {
       logo: profile.logo,
       exchange: profile.exchange,
       industry: profile.finnhubIndustry,
+      country: profile.country,
+      currency: profile.currency,
+      ipo: profile.ipo,
+      website: profile.weburl,
+      phone: profile.phone,
+      shareOutstanding: profile.shareOutstanding,
       assetType: isCryptoAsset ? 'crypto' : 'stock',
     };
 

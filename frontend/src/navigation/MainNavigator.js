@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -24,21 +24,21 @@ function HomeTabs() {
           let iconName;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'home-variant' : 'home-variant-outline';
+            iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Search') {
-            iconName = 'magnify';
+            iconName = focused ? 'search' : 'search-outline';
           } else if (route.name === 'Watchlist') {
-            iconName = focused ? 'clock-time-four' : 'clock-time-four-outline';
+            iconName = focused ? 'time' : 'time-outline';
           } else if (route.name === 'News') {
             iconName = focused ? 'newspaper' : 'newspaper-outline';
           } else if (route.name === 'Profile') {
-            iconName = focused ? 'account' : 'account-outline';
+            iconName = focused ? 'person' : 'person-outline';
           }
 
           return (
-            <MaterialCommunityIcons 
+            <Ionicons 
               name={iconName} 
-              size={focused ? 26 : 24} 
+              size={focused ? 24 : 22} 
               color={color}
               style={{
                 transition: 'all 0.2s ease-in-out',
