@@ -24,9 +24,10 @@ const setCachedData = (key, data) => cache.set(key, data);
 
 // Keep homepage market movers lightweight to avoid Finnhub free-tier rate limiting.
 const MARKET_MOVER_SYMBOLS = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC',
-  'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC',
-  'XOM', 'CVX', 'AVGO', 'COST', 'MRK', 'PEP', 'ADBE', 'QCOM', 'AMGN', 'SBUX'
+  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA',
+  'META', 'NVDA', 'AMD', 'JPM', 'V',
+  'JNJ', 'WMT', 'PG', 'UNH', 'HD',
+  'XOM', 'CVX', 'MRK', 'PEP', 'AMGN'
 ];
 
 const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
@@ -39,6 +40,79 @@ const buildFinnhubQuoteUrl = (symbol) =>
 const buildFinnhubProfileUrl = (symbol) =>
   `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
 
+const getCachedProfileForSymbol = async (symbol) => {
+  const cacheKey = `profile_${symbol}`;
+  const cachedProfile = getCachedData(cacheKey);
+  if (cachedProfile) return cachedProfile;
+
+  try {
+    const response = await axios.get(buildFinnhubProfileUrl(symbol));
+    const profile = response.data || {};
+    setCachedData(cacheKey, profile);
+    return profile;
+  } catch (error) {
+    return {};
+  }
+};
+
+const buildCachedAssetFallback = (symbol) => {
+  const normalized = String(symbol || '').toUpperCase();
+  const movers = getCachedData('market_movers_snapshot');
+  const moverMatch =
+    movers?.gainers?.find((item) => item.symbol === normalized) ||
+    movers?.losers?.find((item) => item.symbol === normalized);
+
+  if (moverMatch) {
+    return {
+      symbol: normalized,
+      name: moverMatch.name || normalized,
+      price: moverMatch.price,
+      change: moverMatch.change,
+      changePercent: moverMatch.changePercent,
+      open: null,
+      high: null,
+      low: null,
+      previousClose: null,
+      volume: null,
+      marketCap: null,
+      week52High: null,
+      week52Low: null,
+      logo: moverMatch.logo || null,
+      exchange: null,
+      industry: null,
+      assetType: 'stock',
+      stale: true,
+    };
+  }
+
+  const crypto = getCachedData('crypto_prices') || [];
+  const cryptoMatch = crypto.find((item) => item.symbol === normalized);
+  if (cryptoMatch) {
+    return {
+      symbol: normalized,
+      name: cryptoMatch.name || normalized,
+      price: cryptoMatch.price,
+      change: null,
+      changePercent: cryptoMatch.changePercent,
+      open: null,
+      high: null,
+      low: null,
+      previousClose: null,
+      volume: null,
+      marketCap: null,
+      week52High: null,
+      week52Low: null,
+      logo: cryptoMatch.logo || null,
+      exchange: 'CRYPTO',
+      industry: null,
+      assetType: 'crypto',
+      stale: true,
+    };
+  }
+
+  return null;
+};
+
 const getMarketMoversSnapshot = async () => {
   const cacheKey = 'market_movers_snapshot';
   const cached = getCachedData(cacheKey);
@@ -47,7 +121,10 @@ const getMarketMoversSnapshot = async () => {
   const stocks = await Promise.all(
     MARKET_MOVER_SYMBOLS.map(async (symbol) => {
       try {
-        const quoteResponse = await axios.get(buildFinnhubQuoteUrl(symbol));
+        const [quoteResponse, profile] = await Promise.all([
+          axios.get(buildFinnhubQuoteUrl(symbol)),
+          getCachedProfileForSymbol(symbol),
+        ]);
         const data = quoteResponse.data;
 
         if (!data || data.c === undefined || data.c === null || data.dp === undefined || data.c <= 0) {
@@ -56,11 +133,11 @@ const getMarketMoversSnapshot = async () => {
 
         return {
           symbol,
-          name: symbol,
+          name: profile.name || symbol,
           price: data.c,
           change: data.d,
           changePercent: data.dp,
-          logo: null,
+          logo: profile.logo || null,
         };
       } catch (error) {
         return null;
@@ -170,6 +247,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
           const cryptoStatus = getAxiosStatus(cryptoError);
           console.error('Crypto quote error:', cryptoError.message);
           if (cryptoStatus === 429) {
+            const cachedFallback = buildCachedAssetFallback(normalizedSymbol);
+            if (cachedFallback) {
+              return res.json(cachedFallback);
+            }
             return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
           }
           return res.status(404).json({ error: 'Asset not found' });
@@ -178,6 +259,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
         const status = getAxiosStatus(error);
         console.error('Quote error:', error.message);
         if (status === 429) {
+          const cachedFallback = buildCachedAssetFallback(normalizedSymbol);
+          if (cachedFallback) {
+            return res.json(cachedFallback);
+          }
           return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
         }
         return res.status(404).json({ error: 'Stock not found' });
@@ -207,6 +292,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
       } catch (error) {
         const status = getAxiosStatus(error);
         if (status === 429) {
+          const cachedFallback = buildCachedAssetFallback(normalizedSymbol);
+          if (cachedFallback) {
+            return res.json(cachedFallback);
+          }
           return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
         }
       }
@@ -464,5 +553,3 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`\n⚠️  Make sure to set your API keys in the .env file!`);
 });
-
-
