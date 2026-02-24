@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
+import WatchlistScreen from '../screens/WatchlistScreen';
 import NewsScreen from '../screens/NewsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import StockDetailScreen from '../screens/StockDetailScreen';
@@ -26,6 +27,8 @@ function HomeTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Search') {
             iconName = focused ? 'magnify' : 'magnify';
+          } else if (route.name === 'Watchlist') {
+            iconName = focused ? 'bookmark' : 'bookmark-outline';
           } else if (route.name === 'News') {
             iconName = focused ? 'newspaper' : 'newspaper-outline';
           } else if (route.name === 'Profile') {
@@ -89,6 +92,13 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen 
+        name="Watchlist" 
+        component={WatchlistScreen}
+        options={{
+          tabBarLabel: 'Watchlist',
+        }}
+      />
+      <Tab.Screen 
         name="News" 
         component={NewsScreen}
         options={{
@@ -142,4 +152,3 @@ export default function MainNavigator() {
     </Stack.Navigator>
   );
 }
-

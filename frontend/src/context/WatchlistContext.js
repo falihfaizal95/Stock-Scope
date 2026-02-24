@@ -46,7 +46,8 @@ export const WatchlistProvider = ({ children }) => {
         // Demo mode: Load from localStorage
         const stored = localStorage.getItem('watchlist');
         if (stored) {
-          setWatchlist(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setWatchlist(parsed.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)));
         }
       } else {
         // Production mode: Load from Firebase
@@ -59,7 +60,7 @@ export const WatchlistProvider = ({ children }) => {
         querySnapshot.forEach((doc) => {
           items.push({ id: doc.id, ...doc.data() });
         });
-        setWatchlist(items);
+        setWatchlist(items.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)));
       }
     } catch (error) {
       console.error('Error fetching watchlist:', error);
@@ -68,27 +69,37 @@ export const WatchlistProvider = ({ children }) => {
     }
   };
 
-  const addToWatchlist = async (symbol, name) => {
+  const addToWatchlist = async (symbol, name, metadata = {}) => {
     if (!user) return { success: false, error: 'Not authenticated' };
 
     try {
+      const existingItem = watchlist.find((item) => item.symbol === symbol);
+      if (existingItem) {
+        return { success: true, alreadyExists: true };
+      }
+
+      const addedAt = new Date().toISOString();
       const watchlistItem = {
         id: `demo-${Date.now()}`,
         userId: user.uid,
         symbol,
         name,
-        addedAt: new Date().toISOString(),
+        addedAt,
+        addedPrice: typeof metadata.addedPrice === 'number' ? metadata.addedPrice : null,
+        addedPriceCurrency: 'USD',
+        logo: metadata.logo || null,
       };
       
       if (DEMO_MODE) {
         // Demo mode: Save to localStorage
         const newWatchlist = [...watchlist, watchlistItem];
-        setWatchlist(newWatchlist);
+        setWatchlist(newWatchlist.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)));
         localStorage.setItem('watchlist', JSON.stringify(newWatchlist));
       } else {
         // Production mode: Save to Firebase
         const docRef = await addDoc(collection(db, 'watchlists'), watchlistItem);
-        setWatchlist([...watchlist, { id: docRef.id, ...watchlistItem }]);
+        const newItem = { id: docRef.id, ...watchlistItem };
+        setWatchlist([...watchlist, newItem].sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)));
       }
       return { success: true };
     } catch (error) {
@@ -137,4 +148,3 @@ export const WatchlistProvider = ({ children }) => {
     </WatchlistContext.Provider>
   );
 };
-

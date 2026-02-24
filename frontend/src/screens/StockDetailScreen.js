@@ -88,7 +88,10 @@ export default function StockDetailScreen() {
         await removeFromWatchlist(watchlistItem.id);
       }
     } else {
-      await addToWatchlist(symbol, stock.name);
+      await addToWatchlist(symbol, stock.name, {
+        addedPrice: typeof stock.price === 'number' ? stock.price : null,
+        logo: stock.logo || null,
+      });
     }
   };
 
