@@ -85,13 +85,19 @@ export default function StockDetailScreen() {
     if (inWatchlist) {
       const watchlistItem = watchlist.find((item) => item.symbol === symbol);
       if (watchlistItem) {
-        await removeFromWatchlist(watchlistItem.id);
+        const result = await removeFromWatchlist(watchlistItem.id);
+        if (!result?.success) {
+          alert(result?.error || 'Failed to remove from watchlist');
+        }
       }
     } else {
-      await addToWatchlist(symbol, stock.name, {
+      const result = await addToWatchlist(symbol, stock.name, {
         addedPrice: typeof stock.price === 'number' ? stock.price : null,
         logo: stock.logo || null,
       });
+      if (!result?.success) {
+        alert(result?.error || 'Failed to add to watchlist');
+      }
     }
   };
 
@@ -166,14 +172,22 @@ export default function StockDetailScreen() {
         </View>
 
         <Button
-          mode={inWatchlist ? 'outlined' : 'contained'}
+          mode="contained"
           onPress={handleWatchlistToggle}
-          style={styles.watchlistButton}
-          buttonColor={inWatchlist ? 'transparent' : theme.colors.primary}
-          textColor={inWatchlist ? theme.colors.primary : '#000'}
+          style={[
+            styles.watchlistButton,
+            {
+              backgroundColor: inWatchlist ? '#1f5f3a' : theme.colors.primary,
+              borderColor: inWatchlist ? '#2a7a4b' : 'transparent',
+            },
+          ]}
+          buttonColor={inWatchlist ? '#1f5f3a' : theme.colors.primary}
+          textColor={inWatchlist ? '#d8ffe7' : '#000'}
+          icon={inWatchlist ? 'check' : 'bookmark-plus-outline'}
           labelStyle={{ fontSize: 16, fontWeight: '600' }}
+          contentStyle={{ paddingVertical: 2 }}
         >
-          {inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
+          {inWatchlist ? 'Added to Watchlist' : 'Add to Watchlist'}
         </Button>
       </View>
 
@@ -412,6 +426,9 @@ const styles = StyleSheet.create({
   },
   watchlistButton: {
     marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    transition: 'background-color 220ms ease, transform 180ms ease, border-color 220ms ease',
   },
   card: {
     marginHorizontal: 16,

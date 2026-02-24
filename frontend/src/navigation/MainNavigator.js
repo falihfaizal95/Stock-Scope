@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -24,11 +24,11 @@ function HomeTabs() {
           let iconName;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
+            iconName = focused ? 'home-variant' : 'home-variant-outline';
           } else if (route.name === 'Search') {
-            iconName = focused ? 'magnify' : 'magnify';
+            iconName = 'magnify';
           } else if (route.name === 'Watchlist') {
-            iconName = focused ? 'bookmark' : 'bookmark-outline';
+            iconName = focused ? 'clock-time-four' : 'clock-time-four-outline';
           } else if (route.name === 'News') {
             iconName = focused ? 'newspaper' : 'newspaper-outline';
           } else if (route.name === 'Profile') {
@@ -36,7 +36,7 @@ function HomeTabs() {
           }
 
           return (
-            <Icon 
+            <MaterialCommunityIcons 
               name={iconName} 
               size={focused ? 26 : 24} 
               color={color}
@@ -63,7 +63,9 @@ function HomeTabs() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
+          letterSpacing: 0.15,
           marginTop: 4,
         },
         tabBarItemStyle: {
