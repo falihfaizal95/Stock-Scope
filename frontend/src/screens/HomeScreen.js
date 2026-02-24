@@ -37,34 +37,30 @@ export default function HomeScreen() {
 
   const fetchData = async () => {
     try {
-      // Fetch data with individual error handling
-      let overview = null;
-      let gainers = [];
-      let losers = [];
-      let cryptoData = [];
+      // Fetch in parallel to reduce homepage load time.
+      const [overviewResult, gainersResult, losersResult, cryptoResult] = await Promise.allSettled([
+        stockAPI.getMarketOverview(),
+        stockAPI.getTopGainers(),
+        stockAPI.getTopLosers(),
+        stockAPI.getCrypto(),
+      ]);
 
-      try {
-        overview = await stockAPI.getMarketOverview();
-      } catch (error) {
-        console.error('Error fetching overview:', error);
+      const overview = overviewResult.status === 'fulfilled' ? overviewResult.value : null;
+      const gainers = gainersResult.status === 'fulfilled' ? (gainersResult.value || []) : [];
+      const losers = losersResult.status === 'fulfilled' ? (losersResult.value || []) : [];
+      const cryptoData = cryptoResult.status === 'fulfilled' ? (cryptoResult.value || []) : [];
+
+      if (overviewResult.status === 'rejected') {
+        console.error('Error fetching overview:', overviewResult.reason);
       }
-
-      try {
-        gainers = await stockAPI.getTopGainers() || [];
-      } catch (error) {
-        console.error('Error fetching gainers:', error);
+      if (gainersResult.status === 'rejected') {
+        console.error('Error fetching gainers:', gainersResult.reason);
       }
-
-      try {
-        losers = await stockAPI.getTopLosers() || [];
-      } catch (error) {
-        console.error('Error fetching losers:', error);
+      if (losersResult.status === 'rejected') {
+        console.error('Error fetching losers:', losersResult.reason);
       }
-
-      try {
-        cryptoData = await stockAPI.getCrypto() || [];
-      } catch (error) {
-        console.error('Error fetching crypto:', error);
+      if (cryptoResult.status === 'rejected') {
+        console.error('Error fetching crypto:', cryptoResult.reason);
       }
 
       setMarketData(overview);

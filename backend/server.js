@@ -21,6 +21,7 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY || 'YOUR_NEWS_API_KEY';
 // Helper function to get cached data
 const getCachedData = (key) => cache.get(key);
 const setCachedData = (key, data) => cache.set(key, data);
+let marketMoversSnapshotPromise = null;
 
 // Keep homepage market movers lightweight to avoid Finnhub free-tier rate limiting.
 const MARKET_MOVER_SYMBOLS = [
@@ -119,48 +120,57 @@ const getMarketMoversSnapshot = async () => {
   const cacheKey = 'market_movers_snapshot';
   const cached = getCachedData(cacheKey);
   if (cached) return cached;
+  if (marketMoversSnapshotPromise) return marketMoversSnapshotPromise;
 
-  const stocks = await Promise.all(
-    MARKET_MOVER_SYMBOLS.map(async (symbol) => {
-      try {
-        const [quoteResponse, profile] = await Promise.all([
-          axios.get(buildFinnhubQuoteUrl(symbol)),
-          getCachedProfileForSymbol(symbol),
-        ]);
-        const data = quoteResponse.data;
+  marketMoversSnapshotPromise = (async () => {
+    const stocks = await Promise.all(
+      MARKET_MOVER_SYMBOLS.map(async (symbol) => {
+        try {
+          const [quoteResponse, profile] = await Promise.all([
+            axios.get(buildFinnhubQuoteUrl(symbol)),
+            getCachedProfileForSymbol(symbol),
+          ]);
+          const data = quoteResponse.data;
 
-        if (!data || data.c === undefined || data.c === null || data.dp === undefined || data.c <= 0) {
+          if (!data || data.c === undefined || data.c === null || data.dp === undefined || data.c <= 0) {
+            return null;
+          }
+
+          return {
+            symbol,
+            name: profile.name || symbol,
+            price: data.c,
+            change: data.d,
+            changePercent: data.dp,
+            logo: profile.logo || null,
+          };
+        } catch (error) {
           return null;
         }
+      })
+    );
 
-        return {
-          symbol,
-          name: profile.name || symbol,
-          price: data.c,
-          change: data.d,
-          changePercent: data.dp,
-          logo: profile.logo || null,
-        };
-      } catch (error) {
-        return null;
-      }
-    })
-  );
+    const validStocks = stocks.filter(Boolean);
+    const snapshot = {
+      gainers: validStocks
+        .filter((stock) => stock.changePercent > 0)
+        .sort((a, b) => b.changePercent - a.changePercent)
+        .slice(0, 20),
+      losers: validStocks
+        .filter((stock) => stock.changePercent < 0)
+        .sort((a, b) => a.changePercent - b.changePercent)
+        .slice(0, 20),
+    };
 
-  const validStocks = stocks.filter(Boolean);
-  const snapshot = {
-    gainers: validStocks
-      .filter((stock) => stock.changePercent > 0)
-      .sort((a, b) => b.changePercent - a.changePercent)
-      .slice(0, 20),
-    losers: validStocks
-      .filter((stock) => stock.changePercent < 0)
-      .sort((a, b) => a.changePercent - b.changePercent)
-      .slice(0, 20),
-  };
+    setCachedData(cacheKey, snapshot);
+    return snapshot;
+  })();
 
-  setCachedData(cacheKey, snapshot);
-  return snapshot;
+  try {
+    return await marketMoversSnapshotPromise;
+  } finally {
+    marketMoversSnapshotPromise = null;
+  }
 };
 
 // Search stocks
