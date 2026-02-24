@@ -63,6 +63,10 @@ export default function StockDetailScreen() {
     });
   }, [navigation, symbol]);
 
+  useEffect(() => {
+    setHoveredChartIndex(null);
+  }, [symbol, selectedChartRange]);
+
   const fetchStockDetails = async () => {
     setLoading(true);
     setStock(null);
@@ -239,8 +243,14 @@ export default function StockDetailScreen() {
     return Array.from({ length: points }, (_, i) => new Date(now - step * (points - 1 - i)));
   };
 
-  const chartData = generateChartData(selectedChartRange);
-  const chartTimestamps = generateChartTimestamps(selectedChartRange, chartData.length);
+  const chartData = React.useMemo(
+    () => generateChartData(selectedChartRange),
+    [selectedChartRange, stock?.symbol, stock?.price, stock?.changePercent]
+  );
+  const chartTimestamps = React.useMemo(
+    () => generateChartTimestamps(selectedChartRange, chartData.length),
+    [selectedChartRange, chartData.length]
+  );
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
   const chartRanges = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
   const chartInnerWidth = screenWidth - 64;
