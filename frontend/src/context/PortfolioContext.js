@@ -77,7 +77,7 @@ export const PortfolioProvider = ({ children }) => {
     }
 
     try {
-      const updatedHoldings = [...portfolio.holdings];
+      const updatedHoldings = portfolio.holdings.map((holding) => ({ ...holding }));
       const existingHolding = updatedHoldings.find(h => h.symbol === symbol);
       
       if (existingHolding) {
@@ -108,7 +108,7 @@ export const PortfolioProvider = ({ children }) => {
     } catch (error) {
       console.error('Error buying stock:', error);
       try {
-        const updatedHoldings = [...portfolio.holdings];
+        const updatedHoldings = portfolio.holdings.map((holding) => ({ ...holding }));
         const existingHolding = updatedHoldings.find(h => h.symbol === symbol);
         if (existingHolding) {
           const newShares = existingHolding.shares + shares;
@@ -118,7 +118,12 @@ export const PortfolioProvider = ({ children }) => {
         } else {
           updatedHoldings.push({ symbol, shares, avgPrice: price, purchaseDate: new Date().toISOString() });
         }
-        const updatedPortfolio = { ...portfolio, cash: portfolio.cash - totalCost, holdings: updatedHoldings };
+        const updatedPortfolio = {
+          ...portfolio,
+          cash: portfolio.cash - totalCost,
+          holdings: updatedHoldings,
+          totalValue: portfolio.totalValue,
+        };
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
         }
@@ -137,9 +142,10 @@ export const PortfolioProvider = ({ children }) => {
     if (!holding || holding.shares < shares) {
       return { success: false, error: 'Insufficient shares' };
     }
+    const proceeds = shares * price;
 
     try {
-      const updatedHoldings = [...portfolio.holdings];
+      const updatedHoldings = portfolio.holdings.map((item) => ({ ...item }));
       const holdingIndex = updatedHoldings.findIndex(h => h.symbol === symbol);
       
       if (holding.shares === shares) {
@@ -148,7 +154,6 @@ export const PortfolioProvider = ({ children }) => {
         updatedHoldings[holdingIndex].shares -= shares;
       }
 
-      const proceeds = shares * price;
       const updatedPortfolio = {
         ...portfolio,
         cash: portfolio.cash + proceeds,
@@ -163,7 +168,7 @@ export const PortfolioProvider = ({ children }) => {
     } catch (error) {
       console.error('Error selling stock:', error);
       try {
-        const updatedHoldings = [...portfolio.holdings];
+        const updatedHoldings = portfolio.holdings.map((item) => ({ ...item }));
         const holdingIndex = updatedHoldings.findIndex(h => h.symbol === symbol);
         if (holdingIndex === -1 || updatedHoldings[holdingIndex].shares < shares) {
           return { success: false, error: 'Insufficient shares' };
@@ -173,7 +178,12 @@ export const PortfolioProvider = ({ children }) => {
         } else {
           updatedHoldings[holdingIndex].shares -= shares;
         }
-        const updatedPortfolio = { ...portfolio, cash: portfolio.cash + proceeds, holdings: updatedHoldings };
+        const updatedPortfolio = {
+          ...portfolio,
+          cash: portfolio.cash + proceeds,
+          holdings: updatedHoldings,
+          totalValue: portfolio.totalValue,
+        };
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
         }
