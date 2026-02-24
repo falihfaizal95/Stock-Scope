@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Modal,
+  Platform,
 } from 'react-native';
 import {
   Text,
@@ -41,6 +42,7 @@ export default function StockDetailScreen() {
   const [tradeSuccessMessage, setTradeSuccessMessage] = useState('');
   const [selectedChartRange, setSelectedChartRange] = useState('1D');
   const [selectedEarningsReport, setSelectedEarningsReport] = useState(null);
+  const [hoveredChartIndex, setHoveredChartIndex] = useState(null);
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
   const { portfolio, buyStock, sellStock } = usePortfolio();
   const theme = useTheme();
@@ -221,9 +223,50 @@ export default function StockDetailScreen() {
     return data;
   };
 
+  const generateChartTimestamps = (range, points) => {
+    const now = Date.now();
+    const intervals = {
+      '1D': 60 * 60 * 1000,
+      '1W': 8 * 60 * 60 * 1000,
+      '1M': 24 * 60 * 60 * 1000,
+      '3M': 3 * 24 * 60 * 60 * 1000,
+      'YTD': 7 * 24 * 60 * 60 * 1000,
+      '1Y': 7 * 24 * 60 * 60 * 1000,
+      '5Y': 30 * 24 * 60 * 60 * 1000,
+      'MAX': 45 * 24 * 60 * 60 * 1000,
+    };
+    const step = intervals[range] || intervals['1D'];
+    return Array.from({ length: points }, (_, i) => new Date(now - step * (points - 1 - i)));
+  };
+
   const chartData = generateChartData(selectedChartRange);
+  const chartTimestamps = generateChartTimestamps(selectedChartRange, chartData.length);
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
   const chartRanges = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
+  const chartInnerWidth = screenWidth - 64;
+  const chartDisplayIndex = hoveredChartIndex ?? (chartData.length - 1);
+  const chartDisplayPrice = chartData[chartDisplayIndex];
+  const chartDisplayTime = chartTimestamps[chartDisplayIndex];
+  const hoverX = chartData.length > 1 ? (chartDisplayIndex / (chartData.length - 1)) * chartInnerWidth : 0;
+  const minChart = Math.min(...chartData);
+  const maxChart = Math.max(...chartData);
+  const chartHeight = 260;
+  const hoverY =
+    maxChart === minChart
+      ? chartHeight / 2
+      : chartHeight - ((chartDisplayPrice - minChart) / (maxChart - minChart)) * (chartHeight - 12);
+
+  const formatChartHoverTime = (date, range) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (range === '1D') {
+      return d.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+    if (range === '1W' || range === '1M') {
+      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric' });
+    }
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
   const aboutSummary = stock.industry
     ? `${stock.name} operates in the ${stock.industry} industry and trades on ${stock.exchange || 'its primary exchange'}.`
     : `${stock.name} trades on ${stock.exchange || 'its primary exchange'}.`;
@@ -291,9 +334,17 @@ export default function StockDetailScreen() {
 
       <View style={[styles.chartCard, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.appleChartTopMeta}>
-          <Text style={[styles.chartMetaLabel, { color: theme.colors.placeholder }]}>
-            {selectedChartRange === '1D' ? '24 Hour Market' : `${selectedChartRange} Market`}
-          </Text>
+          <View>
+            <Text style={[styles.chartMetaLabel, { color: theme.colors.placeholder }]}>
+              {selectedChartRange === '1D' ? '24 Hour Market' : `${selectedChartRange} Market`}
+            </Text>
+            <Text style={[styles.chartHoverPrice, { color: theme.colors.text }]}>
+              ${Number(chartDisplayPrice || stock.price || 0).toFixed(2)}
+            </Text>
+            <Text style={[styles.chartHoverTime, { color: theme.colors.placeholder }]}>
+              {formatChartHoverTime(chartDisplayTime, selectedChartRange)}
+            </Text>
+          </View>
           <Button
             mode="text"
             onPress={() => setChartExpanded(true)}
@@ -316,8 +367,8 @@ export default function StockDetailScreen() {
                 },
               ],
             }}
-            width={screenWidth - 64}
-            height={260}
+            width={chartInnerWidth}
+            height={chartHeight}
             withDots={false}
             withShadow={false}
             withVerticalLines={false}
@@ -354,6 +405,38 @@ export default function StockDetailScreen() {
             fromZero={false}
             segments={0}
           />
+          {Platform.OS === 'web' && (
+            <View
+              style={styles.chartHoverLayer}
+              onMouseMove={(event) => {
+                const x = event?.nativeEvent?.locationX ?? 0;
+                const clampedX = Math.max(0, Math.min(chartInnerWidth, x));
+                const idx = Math.round((clampedX / chartInnerWidth) * (chartData.length - 1));
+                setHoveredChartIndex(Math.max(0, Math.min(chartData.length - 1, idx)));
+              }}
+              onMouseLeave={() => setHoveredChartIndex(null)}
+            >
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.chartCrosshair,
+                  { left: Math.max(0, Math.min(chartInnerWidth - 1, hoverX)) },
+                ]}
+              />
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.chartHoverDot,
+                  {
+                    left: Math.max(0, Math.min(chartInnerWidth - 10, hoverX - 5)),
+                    top: Math.max(0, Math.min(chartHeight - 10, hoverY - 5)),
+                    borderColor: theme.colors.background,
+                    backgroundColor: chartColor,
+                  },
+                ]}
+              />
+            </View>
+          )}
         </View>
         <View style={[styles.chartDottedDivider, { borderBottomColor: theme.colors.border }]} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartRangeRow}>
@@ -698,6 +781,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  chartHoverPrice: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  chartHoverTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   chartDottedDivider: {
     borderBottomWidth: 1,
     borderStyle: 'dashed',
@@ -722,6 +814,27 @@ const styles = StyleSheet.create({
     width: 22,
     height: 3,
     borderRadius: 3,
+  },
+  chartHoverLayer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+  },
+  chartCrosshair: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  chartHoverDot: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
   },
   expandButton: {
     borderRadius: 8,
