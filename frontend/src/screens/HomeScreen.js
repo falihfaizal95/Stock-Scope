@@ -30,6 +30,9 @@ export default function HomeScreen() {
   const { watchlist } = useWatchlist();
   const { portfolio } = usePortfolio();
   const theme = useTheme();
+  const portfolioTotal = portfolio?.totalValue ?? portfolio?.cash ?? 0;
+  const buyingPower = portfolio?.cash ?? 0;
+  const positionCount = portfolio?.holdings?.length ?? 0;
 
   useEffect(() => {
     fetchData();
@@ -254,6 +257,23 @@ export default function HomeScreen() {
     );
   };
 
+  const getPortfolioChartData = () => {
+    const base = Math.max(portfolioTotal || 1000000, 1);
+    const points = 36;
+    const values = Array.from({ length: points }, (_, i) => {
+      const wave = Math.sin(i / 3.8) * 0.006 + Math.cos(i / 6.2) * 0.004;
+      const drift = (i / points) * 0.01;
+      return Number((base * (0.985 + drift + wave)).toFixed(2));
+    });
+    return values;
+  };
+
+  const portfolioChartData = getPortfolioChartData();
+  const portfolioStart = portfolioChartData[0] || portfolioTotal || 0;
+  const portfolioChange = portfolioTotal - portfolioStart;
+  const portfolioChangePct = portfolioStart > 0 ? (portfolioChange / portfolioStart) * 100 : 0;
+  const portfolioPositive = portfolioChange >= 0;
+
   if (loading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
@@ -289,34 +309,98 @@ export default function HomeScreen() {
 
       {portfolio && (
         <View style={[styles.portfolioCard, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.portfolioTitle, { color: theme.colors.text }]}>
-            Your Portfolio
-          </Text>
-          <View style={styles.portfolioRow}>
+          <View style={styles.portfolioHeaderRow}>
             <View>
-              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
-                Cash
+              <Text style={[styles.portfolioAccountType, { color: theme.colors.text }]}>
+                Individual
               </Text>
-              <Text style={[styles.portfolioValue, { color: theme.colors.text }]}>
-                ${portfolio.cash?.toFixed(2) || '0.00'}
+              <Text style={[styles.portfolioPrimaryValue, { color: theme.colors.text }]}>
+                ${portfolioTotal.toFixed(2)}
+              </Text>
+              <Text
+                style={[
+                  styles.portfolioChangeLine,
+                  { color: portfolioPositive ? theme.colors.positive : theme.colors.negative },
+                ]}
+              >
+                {portfolioPositive ? '+' : '-'}${Math.abs(portfolioChange).toFixed(2)} (
+                {portfolioPositive ? '+' : ''}
+                {portfolioChangePct.toFixed(2)}%) Today
               </Text>
             </View>
+            <View style={[styles.portfolioBadge, { backgroundColor: '#f5be41' }]}>
+              <Text style={styles.portfolioBadgeText}>$1M pie</Text>
+            </View>
+          </View>
+
+          <View style={styles.portfolioBigChartWrap}>
+            <LineChart
+              data={{
+                labels: new Array(portfolioChartData.length).fill(''),
+                datasets: [
+                  {
+                    data: portfolioChartData,
+                    color: () => (portfolioPositive ? theme.colors.positive : theme.colors.negative),
+                    strokeWidth: 2.5,
+                  },
+                ],
+              }}
+              width={screenWidth - 72}
+              height={180}
+              withDots={false}
+              withShadow={false}
+              withVerticalLines={false}
+              withHorizontalLines={false}
+              withInnerLines={false}
+              withOuterLines={false}
+              chartConfig={{
+                backgroundColor: 'transparent',
+                backgroundGradientFrom: 'transparent',
+                backgroundGradientTo: 'transparent',
+                decimalPlaces: 0,
+                color: () => (portfolioPositive ? theme.colors.positive : theme.colors.negative),
+                labelColor: () => 'transparent',
+                style: { borderRadius: 0 },
+                propsForBackgroundLines: { strokeWidth: 0 },
+                propsForDots: { r: '0' },
+              }}
+              bezier
+              style={styles.portfolioChart}
+            />
+          </View>
+
+          <View style={[styles.portfolioTimeframeRow, { borderTopColor: theme.colors.border }]}>
+            {['LIVE', '1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'].map((label, index) => {
+              const active = label === '1D';
+              return (
+                <Text
+                  key={label}
+                  style={[
+                    styles.portfolioTimeframeText,
+                    {
+                      color: active ? theme.colors.positive : theme.colors.text,
+                      marginRight: index === 7 ? 0 : 14,
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              );
+            })}
+          </View>
+
+          <View style={[styles.buyingPowerRow, { borderTopColor: theme.colors.border }]}>
             <View>
-              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
-                Holdings
+              <Text style={[styles.buyingPowerLabel, { color: theme.colors.text }]}>
+                Buying power
               </Text>
-              <Text style={[styles.portfolioValue, { color: theme.colors.text }]}>
-                {portfolio.holdings?.length || 0}
+              <Text style={[styles.buyingPowerSubtext, { color: theme.colors.placeholder }]}>
+                Cash left to trade • {positionCount} position{positionCount === 1 ? '' : 's'}
               </Text>
             </View>
-            <View>
-              <Text style={[styles.portfolioLabel, { color: theme.colors.placeholder }]}>
-                Total Value
-              </Text>
-              <Text style={[styles.portfolioValue, { color: theme.colors.primary }]}>
-                ${portfolio.totalValue?.toFixed(2) || portfolio.cash?.toFixed(2) || '0.00'}
-              </Text>
-            </View>
+            <Text style={[styles.buyingPowerValue, { color: theme.colors.text }]}>
+              ${buyingPower.toFixed(2)}
+            </Text>
           </View>
         </View>
       )}
@@ -620,7 +704,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -643,5 +727,78 @@ const styles = StyleSheet.create({
   portfolioValue: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  portfolioHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  portfolioAccountType: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  portfolioPrimaryValue: {
+    fontSize: 38,
+    fontWeight: '800',
+    lineHeight: 42,
+    marginBottom: 6,
+  },
+  portfolioChangeLine: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  portfolioBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  portfolioBadgeText: {
+    color: '#111111',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  portfolioBigChartWrap: {
+    marginTop: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  portfolioChart: {
+    marginLeft: -10,
+    borderRadius: 0,
+    paddingRight: 0,
+    paddingLeft: 0,
+  },
+  portfolioTimeframeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderTopWidth: 1,
+  },
+  portfolioTimeframeText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  buyingPowerRow: {
+    borderTopWidth: 1,
+    paddingTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  buyingPowerLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  buyingPowerSubtext: {
+    fontSize: 12,
+  },
+  buyingPowerValue: {
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
