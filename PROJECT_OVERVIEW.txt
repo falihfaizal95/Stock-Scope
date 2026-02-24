@@ -1,257 +1,226 @@
 ╔════════════════════════════════════════════════════════════════╗
-║                    STOCKSCOPE - MVP COMPLETE                    ║
-║              Cross-Platform Stock Analyzer App                  ║
+║                    STOCKSCOPE - PROJECT OVERVIEW              ║
+║        Cross-Platform Stock Research + Paper Trading App      ║
 ╚════════════════════════════════════════════════════════════════╝
 
-📊 PROJECT STATUS: ✅ COMPLETE
-📅 Phase 1 MVP: ✅ ALL FEATURES IMPLEMENTED
+PROJECT STATUS
+- Active MVP+ build with recent feature expansions (watchlist analytics, paper trading, richer stock insights)
+- Frontend and backend both running locally via Expo + Express
+- Repository: https://github.com/falihfaizal95/Stock-Scope.git
 
 ═══════════════════════════════════════════════════════════════════
 
-📱 FRONTEND (React Native + Expo)
-═══════════════════════════════════════════════════════════════════
+FRONTEND (React Native + Expo)
+- Platform support: Web, iOS, Android (Expo)
+- UI framework: React Native Paper
+- Navigation: React Navigation (Tabs + Stack)
+- State: React Context (Auth, Watchlist, Portfolio, Theme Mode)
 
-✅ 6 Complete Screens:
-   • Login Screen (Authentication)
-   • Home Screen (Market Overview)
-   • Search Screen (Stock Search)
-   • Stock Detail Screen (Detailed Info)
-   • News Screen (Financial News)
-   • Profile Screen (User Info)
+Main screens/tabs currently implemented
+- Home
+  - Market overview (S&P 500 / NASDAQ proxies)
+  - Top gainers / losers
+  - Crypto section
+- Search
+  - Debounced stock/company search
+  - Top movers and WSJ section when idle
+- Watchlist (new dedicated tab)
+  - Date added
+  - Added price (price at time of watchlist click)
+  - Current price
+  - Gain/Loss ($)
+  - Gain/Loss (%)
+- News
+  - Business headlines
+  - Article detail screen
+- Profile
+  - Account info
+  - Settings section (light/dark mode toggle)
+  - Paper trading portfolio summary + holdings list
+  - Watchlist summary section
 
-✅ Navigation System:
-   • Bottom Tab Navigation
-   • Stack Navigation
-   • Auth-based Routing
+Stock Detail screen (expanded)
+- Current price + % change
+- Add/remove watchlist button (stateful, check icon)
+- Trade button
+- Chart + expandable chart modal
+- Richer key statistics (market cap, PE, dividend yield, avg volume, beta, EPS, 52W range, etc.)
+- Related stocks section (peer/comparable stocks)
+- Earnings reports section (actual/estimate/surprise)
+- News section
 
-✅ State Management:
-   • Auth Context (Authentication)
-   • Watchlist Context (User Watchlist)
+Paper Trading (recently added)
+- Buy / Sell flow from stock detail
+- Trade modal with:
+  - Buy/Sell selector
+  - Shares input
+  - Available cash
+  - Shares owned
+  - Max buy / max sell estimate
+  - Estimated cost/proceeds
+- Success confirmation screen after trade action
+- Holdings shown in Profile (not confused with watchlist)
 
-✅ UI/UX:
-   • Material Design 3
-   • Light/Dark Mode Support
-   • Responsive Layouts
-   • Loading States
-   • Error Handling
+Theme / Settings
+- Light mode / dark mode toggle in Profile settings
+- App theme switches at runtime
 
-═══════════════════════════════════════════════════════════════════
-
-🔧 BACKEND (Node.js + Express)
-═══════════════════════════════════════════════════════════════════
-
-✅ 8 API Endpoints:
-   • GET /api/stock/search
-   • GET /api/stock/:symbol
-   • GET /api/market/overview
-   • GET /api/market/gainers
-   • GET /api/market/losers
-   • GET /api/news
-   • GET /api/news/:symbol
-   • GET /health
-
-✅ Features:
-   • API Caching (5-minute TTL)
-   • CORS Configuration
-   • Error Handling
-   • Environment Variables
-
-═══════════════════════════════════════════════════════════════════
-
-🔐 INTEGRATION
-═══════════════════════════════════════════════════════════════════
-
-✅ Firebase:
-   • Authentication (Email/Password)
-   • Firestore (Watchlist Storage)
-   • Security Rules
-
-✅ External APIs:
-   • Finnhub (Stock Data)
-   • NewsAPI (Financial News)
-
-═══════════════════════════════════════════════════════════════════
-
-✨ FEATURES IMPLEMENTED
-═══════════════════════════════════════════════════════════════════
-
-✅ Authentication
-   • Email/Password sign up
-   • Email/Password sign in
-   • Sign out
-   • Protected routes
-   • Session persistence
-
-✅ Market Overview
-   • S&P 500 and NASDAQ indices
-   • Top gainers display
-   • Top losers display
-   • Pull-to-refresh
-
-✅ Stock Search
-   • Search by ticker or company name
-   • Live search results
-   • Navigate to details
-
-✅ Stock Details
-   • Current price and change
-   • Key statistics
-   • Related news
-   • Add/remove from watchlist
-
-✅ Watchlist
-   • Add/remove stocks
-   • Per-user storage
-   • Firestore integration
-
-✅ News Feed
-   • Latest financial headlines
-   • Stock-specific news
-   • Pull-to-refresh
-
-✅ User Profile
-   • User information
-   • Sign out functionality
+Bottom tab UX polish
+- Home icon = house icon
+- Search icon = magnifying glass
+- Watchlist icon = clock icon
+- Bold Apple-style font stack for labels
+- Blue hover/active indicator styling on web tab bar
 
 ═══════════════════════════════════════════════════════════════════
 
-📁 PROJECT STRUCTURE
+BACKEND (Node.js + Express)
+- Express API with CORS + JSON parsing
+- In-memory cache (NodeCache, 5-minute TTL)
+- External providers:
+  - Finnhub (quotes, profiles, news, peers, earnings, metrics)
+  - NewsAPI (business headlines / WSJ)
+
+Key backend endpoints (current)
+- GET /api/stock/search?q={query}
+- GET /api/stock/:symbol
+- GET /api/stock/:symbol/related
+- GET /api/stock/:symbol/earnings
+- GET /api/market/overview
+- GET /api/market/gainers
+- GET /api/market/losers
+- GET /api/crypto
+- GET /api/news
+- GET /api/news/wsj
+- GET /api/news/:symbol
+- GET /health
+
+Rate-limit hardening work already added
+- Reduced homepage market-mover API fanout to avoid Finnhub free-tier exhaustion
+- Cached market movers snapshot reused for gainers/losers
+- Cached fallbacks for stock detail when provider is temporarily throttled
+- Crypto symbol fallback handling in stock detail route (e.g., BTC, ETH)
+
 ═══════════════════════════════════════════════════════════════════
+
+DATA & STORAGE MODEL (CURRENT BEHAVIOR)
+
+Authentication / user profile
+- Firebase Auth (Email/Password)
+- Firestore `users` documents for profile data
+
+Watchlist
+- Stored in Firestore `watchlists` collection (per user)
+- Each entry now includes:
+  - symbol
+  - name
+  - addedAt (timestamp)
+  - addedPrice (entry/watch price)
+  - logo
+- Local fallback storage is used on web if Firestore write fails (to avoid silent UX failure)
+
+Portfolio / paper trading
+- Firestore `portfolios` doc per user (when available)
+- Local fallback portfolio storage used if Firestore read/write fails
+- Starting paper trading cash: $1,000,000
+- Holdings track symbol, shares, avgPrice, purchaseDate
+
+═══════════════════════════════════════════════════════════════════
+
+PROJECT STRUCTURE (HIGH LEVEL)
 
 StockScope/
-├── 📱 frontend/               # React Native App
-│   ├── src/
-│   │   ├── screens/          # 6 screens
-│   │   ├── navigation/       # Navigation setup
-│   │   ├── context/          # State management
-│   │   └── utils/            # Utilities
+├── frontend/
 │   ├── App.js
+│   ├── src/
+│   │   ├── components/
+│   │   │   └── ExpandedChart.js
+│   │   ├── context/
+│   │   │   ├── AuthContext.js
+│   │   │   ├── WatchlistContext.js
+│   │   │   ├── PortfolioContext.js
+│   │   │   └── ThemeModeContext.js
+│   │   ├── navigation/
+│   │   │   ├── MainNavigator.js
+│   │   │   └── tabStyles.css
+│   │   ├── screens/
+│   │   │   ├── HomeScreen.js
+│   │   │   ├── SearchScreen.js
+│   │   │   ├── WatchlistScreen.js
+│   │   │   ├── StockDetailScreen.js
+│   │   │   ├── NewsScreen.js
+│   │   │   ├── NewsDetailScreen.js
+│   │   │   ├── ProfileScreen.js
+│   │   │   └── LoginScreen.js
+│   │   └── utils/
+│   │       ├── api.js
+│   │       ├── firebase.js
+│   │       ├── theme.js
+│   │       └── fonts.js
 │   └── package.json
-│
-├── 🔧 backend/                # Node.js API
-│   ├── server.js            # API server
+├── backend/
+│   ├── server.js
 │   ├── package.json
 │   └── .env.example
-│
-└── 📚 Documentation/
-    ├── START_HERE.md        # Start here!
-    ├── README.md            # Main docs
-    ├── QUICKSTART.md        # Quick start
-    ├── API_KEYS_GUIDE.md    # API setup
-    ├── FEATURES.md          # Features list
-    ├── PROJECT_STRUCTURE.md # Architecture
-    ├── SUMMARY.md           # Summary
-    └── setup.sh             # Setup script
+└── docs + setup files
 
 ═══════════════════════════════════════════════════════════════════
 
-🚀 QUICK START
-═══════════════════════════════════════════════════════════════════
-
-1. Run Setup:
-   $ ./setup.sh
-
-2. Configure API Keys:
-   - Backend: backend/.env
-   - Frontend: frontend/src/utils/firebase.js
-
-3. Start Backend:
-   $ cd backend && npm run dev
-
-4. Start Frontend:
-   $ cd frontend && npm start
-
-5. Run the App:
-   - Press 'i' for iOS
-   - Press 'a' for Android
-   - Press 'w' for Web
+CURRENT KNOWN LIMITATIONS / NOTES
+- "People who own X also own" is currently implemented via peer/comparable-stock data, not true holder-overlap ownership data.
+- Full earnings call transcripts are not yet integrated (earnings report numbers are available).
+- Search endpoint still makes many upstream requests and can be optimized further.
+- Some data paths use local fallback storage when Firebase write/read is blocked by rules/config (helps web testing UX).
+- Expo asset image files referenced in app.json should exist for production builds.
 
 ═══════════════════════════════════════════════════════════════════
 
-🔑 REQUIRED API KEYS
-═══════════════════════════════════════════════════════════════════
+LOCAL RUN INSTRUCTIONS (WEB)
+1. Start backend
+   cd backend
+   npm install
+   npm run dev
 
-1. Finnhub (Stock Data)
-   URL: https://finnhub.io/register
-   Free: 60 calls/minute
+2. Start frontend (Expo)
+   cd frontend
+   npm install
+   npm start -- --web --port 8081
 
-2. NewsAPI (Financial News)
-   URL: https://newsapi.org/register
-   Free: 100 requests/day
+3. Open web app
+   http://localhost:8081
 
-3. Firebase (Auth & Database)
-   URL: https://console.firebase.google.com
-   Free: 50K reads/day
+Backend health check
+- http://localhost:3000/health
 
-📖 Detailed Guide: API_KEYS_GUIDE.md
-
-═══════════════════════════════════════════════════════════════════
-
-📚 DOCUMENTATION
-═══════════════════════════════════════════════════════════════════
-
-| Document              | Description                    |
-|-----------------------|--------------------------------|
-| START_HERE.md         | Start here!                    |
-| README.md             | Main documentation             |
-| QUICKSTART.md         | Quick start guide              |
-| API_KEYS_GUIDE.md     | API setup guide                |
-| FEATURES.md           | Complete feature list          |
-| PROJECT_STRUCTURE.md  | Project architecture           |
-| SUMMARY.md            | Project summary                |
+Important configuration
+- backend/.env (Finnhub + NewsAPI keys)
+- frontend/src/utils/firebase.js (Firebase config)
 
 ═══════════════════════════════════════════════════════════════════
 
-🎯 NEXT STEPS
-═══════════════════════════════════════════════════════════════════
-
-Immediate:
-✅ Get API keys
-✅ Configure Firebase
-✅ Run backend server
-✅ Run frontend app
-✅ Test all features
-
-Short-term:
-• Add interactive charts
-• Implement price alerts
-• Add portfolio tracking
-• Improve error handling
-• Add unit tests
-
-Long-term:
-• Deploy backend to cloud
-• Build production apps
-• Set up monitoring
-• Implement analytics
-• Add CI/CD pipeline
+RECENTLY ADDED / UPDATED FEATURES (LATEST PASS)
+- Dedicated Watchlist tab with performance tracking (date added + entry price + P/L)
+- Watchlist button visual state + check icon
+- Bottom tab icon/font/hover polish
+- Stock detail white-screen crash fix (hook ordering)
+- Backend rate-limit mitigation and cached stock fallback
+- Expanded stock detail insights (metrics, earnings, related stocks)
+- Paper trading trade modal + buy/sell flow + success confirmation
+- Profile fixes (holdings ≠ watchlist) + theme toggle settings
+- Expanded chart stats panel with much richer metrics
 
 ═══════════════════════════════════════════════════════════════════
 
-💰 COST ESTIMATE
-═══════════════════════════════════════════════════════════════════
-
-Free Tier (Monthly):
-• Finnhub:     $0 (60 calls/min)
-• NewsAPI:     $0 (100 calls/day)
-• Firebase:    $0 (50K reads/day)
-• Total:       $0/month
-
-═══════════════════════════════════════════════════════════════════
-
-🎉 CONGRATULATIONS!
-═══════════════════════════════════════════════════════════════════
-
-You have a fully functional stock market app with:
-✅ Real-time stock data
-✅ User authentication
-✅ Personal watchlist
-✅ Financial news
-✅ Cross-platform support
-
-Ready to launch! 🚀
+NEXT RECOMMENDED IMPROVEMENTS
+- Integrate real ownership-overlap / institutional holdings API for true “also own” data
+- Add earnings call transcript API + transcript viewer
+- Add persistent trade history ledger (orders + fills)
+- Add portfolio performance charts (equity curve, realized/unrealized P/L)
+- Improve search endpoint efficiency and batching to reduce API usage
+- Add settings screen route (separate page) and persist theme preference across sessions
+- Add tests (backend endpoint tests + frontend smoke tests)
 
 ═══════════════════════════════════════════════════════════════════
 
-Built with ❤️ using React Native and Node.js
-Last Updated: January 2024
+Last Updated: February 24, 2026
+Maintainer snapshot generated from current codebase state.
