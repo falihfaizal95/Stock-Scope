@@ -76,6 +76,7 @@ function HomeTabs() {
         tabBarIconStyle: {
           marginBottom: 2,
         },
+        animationEnabled: true,
         headerShown: false,
       })}
     >
@@ -114,22 +115,6 @@ function HomeTabs() {
           tabBarLabel: 'Profile',
         }}
       />
-      <Tab.Screen 
-        name="StockDetail" 
-        component={StockDetailScreen}
-        options={{
-          tabBarLabel: 'Stock',
-          tabBarButton: () => null, // Hide from tab bar but keep in navigator
-        }}
-      />
-      <Tab.Screen 
-        name="NewsDetail" 
-        component={NewsDetailScreen}
-        options={{
-          tabBarLabel: 'Article',
-          tabBarButton: () => null, // Hide from tab bar but keep in navigator
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -142,11 +127,32 @@ export default function MainNavigator() {
       screenOptions={{ 
         headerShown: false,
         contentStyle: { backgroundColor: '#000000' },
+        animation: 'fade',
       }}
     >
       {user ? (
         <>
-          <Stack.Screen name="MainTabs" component={HomeTabs} />
+          <Stack.Screen
+            name="MainTabs"
+            component={HomeTabs}
+            options={{ animation: 'fade' }}
+          />
+          <Stack.Screen
+            name="StockDetail"
+            component={StockDetailScreen}
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="NewsDetail"
+            component={NewsDetailScreen}
+            options={{
+              headerShown: false,
+              animation: 'fade_from_bottom',
+            }}
+          />
         </>
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} />
