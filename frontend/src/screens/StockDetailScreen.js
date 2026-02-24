@@ -185,42 +185,30 @@ export default function StockDetailScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>
-          Loading stock details...
-        </Text>
-      </View>
-    );
-  }
-
-  if (!stock) {
-    return (
-      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.errorText, { color: theme.colors.error }]}>
-          {errorMessage || 'Stock not found'}
-        </Text>
-      </View>
-    );
-  }
-
-  const isPositive = stock.changePercent >= 0;
+  const safePrice = stock?.price || 150;
+  const safeChangePercent = stock?.changePercent ?? 0;
+  const isPositive = safeChangePercent >= 0;
 
   // Generate mock chart data per selected timeframe (placeholder until historical candles API is wired)
   const generateChartData = (range) => {
     const data = [];
-    const baseValue = stock.price || 150;
+    const baseValue = safePrice;
     const pointsByRange = { '1D': 24, '1W': 20, '1M': 28, '3M': 36, 'YTD': 42, '1Y': 52, '5Y': 60, 'MAX': 72 };
     const driftByRange = { '1D': 0.2, '1W': 0.35, '1M': 0.45, '3M': 0.6, 'YTD': 0.7, '1Y': 0.8, '5Y': 1.0, 'MAX': 1.15 };
     const points = pointsByRange[range] || 24;
     const drift = driftByRange[range] || 0.4;
+    const seedSource = `${symbol}-${range}`;
+    let seed = 0;
+    for (let s = 0; s < seedSource.length; s++) {
+      seed = (seed * 31 + seedSource.charCodeAt(s)) % 100000;
+    }
 
     for (let i = 0; i < points; i++) {
-      const change = isPositive 
-        ? Math.random() * (4 + (points / 20))
-        : -Math.random() * (4 + (points / 20));
+      const amplitude = 4 + (points / 20);
+      const wave1 = Math.sin((i + seed / 97) * 0.65) * (amplitude * 0.9);
+      const wave2 = Math.cos((i + seed / 53) * 1.15) * (amplitude * 0.45);
+      const micro = Math.sin((i + seed / 17) * 2.2) * (amplitude * 0.18);
+      const change = isPositive ? (wave1 + wave2 + micro) : -(wave1 + wave2 + micro);
       const trend = i * (isPositive ? drift : -drift);
       data.push(baseValue + change + trend);
     }
@@ -243,14 +231,8 @@ export default function StockDetailScreen() {
     return Array.from({ length: points }, (_, i) => new Date(now - step * (points - 1 - i)));
   };
 
-  const chartData = React.useMemo(
-    () => generateChartData(selectedChartRange),
-    [selectedChartRange, stock?.symbol, stock?.price, stock?.changePercent]
-  );
-  const chartTimestamps = React.useMemo(
-    () => generateChartTimestamps(selectedChartRange, chartData.length),
-    [selectedChartRange, chartData.length]
-  );
+  const chartData = generateChartData(selectedChartRange);
+  const chartTimestamps = generateChartTimestamps(selectedChartRange, chartData.length);
   const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
   const chartRanges = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
   const chartInnerWidth = screenWidth - 64;
@@ -277,9 +259,30 @@ export default function StockDetailScreen() {
     }
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
-  const aboutSummary = stock.industry
+  const aboutSummary = stock?.industry
     ? `${stock.name} operates in the ${stock.industry} industry and trades on ${stock.exchange || 'its primary exchange'}.`
-    : `${stock.name} trades on ${stock.exchange || 'its primary exchange'}.`;
+    : `${stock?.name || symbol} trades on ${stock?.exchange || 'its primary exchange'}.`;
+
+  if (loading) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.placeholder }]}>
+          Loading stock details...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!stock) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          {errorMessage || 'Stock not found'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
