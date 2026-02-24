@@ -22,6 +22,68 @@ const NEWS_API_KEY = process.env.NEWS_API_KEY || 'YOUR_NEWS_API_KEY';
 const getCachedData = (key) => cache.get(key);
 const setCachedData = (key, data) => cache.set(key, data);
 
+// Keep homepage market movers lightweight to avoid Finnhub free-tier rate limiting.
+const MARKET_MOVER_SYMBOLS = [
+  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC',
+  'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC',
+  'XOM', 'CVX', 'AVGO', 'COST', 'MRK', 'PEP', 'ADBE', 'QCOM', 'AMGN', 'SBUX'
+];
+
+const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
+
+const getAxiosStatus = (error) => error?.response?.status;
+
+const buildFinnhubQuoteUrl = (symbol) =>
+  `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
+
+const buildFinnhubProfileUrl = (symbol) =>
+  `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
+
+const getMarketMoversSnapshot = async () => {
+  const cacheKey = 'market_movers_snapshot';
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  const stocks = await Promise.all(
+    MARKET_MOVER_SYMBOLS.map(async (symbol) => {
+      try {
+        const quoteResponse = await axios.get(buildFinnhubQuoteUrl(symbol));
+        const data = quoteResponse.data;
+
+        if (!data || data.c === undefined || data.c === null || data.dp === undefined || data.c <= 0) {
+          return null;
+        }
+
+        return {
+          symbol,
+          name: symbol,
+          price: data.c,
+          change: data.d,
+          changePercent: data.dp,
+          logo: null,
+        };
+      } catch (error) {
+        return null;
+      }
+    })
+  );
+
+  const validStocks = stocks.filter(Boolean);
+  const snapshot = {
+    gainers: validStocks
+      .filter((stock) => stock.changePercent > 0)
+      .sort((a, b) => b.changePercent - a.changePercent)
+      .slice(0, 20),
+    losers: validStocks
+      .filter((stock) => stock.changePercent < 0)
+      .sort((a, b) => a.changePercent - b.changePercent)
+      .slice(0, 20),
+  };
+
+  setCachedData(cacheKey, snapshot);
+  return snapshot;
+};
+
 // Search stocks
 app.get('/api/stock/search', async (req, res) => {
   try {
@@ -94,22 +156,43 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
     // Get quote - handle errors gracefully
     let quoteResponse, profileResponse;
+    let isCryptoAsset = false;
+    const normalizedSymbol = String(symbol || '').toUpperCase();
+    const cryptoQuoteSymbol = `BINANCE:${normalizedSymbol}USDT`;
     try {
-      quoteResponse = await axios.get(
-        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-      );
+      quoteResponse = await axios.get(buildFinnhubQuoteUrl(symbol));
     } catch (error) {
-      console.error('Quote error:', error.message);
-      return res.status(404).json({ error: 'Stock not found' });
+      if (CRYPTO_SYMBOLS.has(normalizedSymbol)) {
+        try {
+          quoteResponse = await axios.get(buildFinnhubQuoteUrl(cryptoQuoteSymbol));
+          isCryptoAsset = true;
+        } catch (cryptoError) {
+          const cryptoStatus = getAxiosStatus(cryptoError);
+          console.error('Crypto quote error:', cryptoError.message);
+          if (cryptoStatus === 429) {
+            return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+          }
+          return res.status(404).json({ error: 'Asset not found' });
+        }
+      } else {
+        const status = getAxiosStatus(error);
+        console.error('Quote error:', error.message);
+        if (status === 429) {
+          return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+        }
+        return res.status(404).json({ error: 'Stock not found' });
+      }
     }
 
     // Get company profile - optional, don't fail if missing
-    try {
-      profileResponse = await axios.get(
-        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-      );
-    } catch (error) {
-      console.error('Profile error:', error.message);
+    if (!isCryptoAsset) {
+      try {
+        profileResponse = await axios.get(buildFinnhubProfileUrl(symbol));
+      } catch (error) {
+        console.error('Profile error:', error.message);
+        profileResponse = { data: {} };
+      }
+    } else {
       profileResponse = { data: {} };
     }
 
@@ -117,27 +200,52 @@ app.get('/api/stock/:symbol', async (req, res) => {
     const profile = profileResponse.data || {};
 
     // Validate quote data
-    if (!quote || quote.c === undefined || quote.c === null) {
-      return res.status(404).json({ error: 'Stock data not available' });
+    if ((!quote || quote.c === undefined || quote.c === null) && CRYPTO_SYMBOLS.has(normalizedSymbol) && !isCryptoAsset) {
+      try {
+        quoteResponse = await axios.get(buildFinnhubQuoteUrl(cryptoQuoteSymbol));
+        isCryptoAsset = true;
+      } catch (error) {
+        const status = getAxiosStatus(error);
+        if (status === 429) {
+          return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+        }
+      }
+    }
+
+    const finalQuote = quoteResponse?.data;
+    if (!finalQuote || finalQuote.c === undefined || finalQuote.c === null) {
+      return res.status(404).json({ error: isCryptoAsset ? 'Crypto data not available' : 'Stock data not available' });
     }
 
     const stockData = {
       symbol: symbol,
-      name: profile.name || symbol,
-      price: quote.c,
-      change: quote.d,
-      changePercent: quote.dp,
-      open: quote.o,
-      high: quote.h,
-      low: quote.l,
-      previousClose: quote.pc,
-      volume: quote.v,
+      name: isCryptoAsset
+        ? ({
+            BTC: 'Bitcoin',
+            ETH: 'Ethereum',
+            BNB: 'BNB',
+            SOL: 'Solana',
+            ADA: 'Cardano',
+            XRP: 'XRP',
+            DOGE: 'Dogecoin',
+            DOT: 'Polkadot',
+          }[normalizedSymbol] || normalizedSymbol)
+        : (profile.name || symbol),
+      price: finalQuote.c,
+      change: finalQuote.d,
+      changePercent: finalQuote.dp,
+      open: finalQuote.o,
+      high: finalQuote.h,
+      low: finalQuote.l,
+      previousClose: finalQuote.pc,
+      volume: finalQuote.v,
       marketCap: profile.marketCapitalization,
       week52High: profile.week52High,
       week52Low: profile.week52Low,
       logo: profile.logo,
       exchange: profile.exchange,
       industry: profile.finnhubIndustry,
+      assetType: isCryptoAsset ? 'crypto' : 'stock',
     };
 
     setCachedData(cacheKey, stockData);
@@ -182,61 +290,8 @@ app.get('/api/market/overview', async (req, res) => {
 // Get top gainers
 app.get('/api/market/gainers', async (req, res) => {
   try {
-    const cacheKey = 'top_gainers';
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    // Expanded list of US stocks from major exchanges (NYSE, NASDAQ)
-    const usStocks = [
-      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'PYPL', 'CRM',
-      'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC', 'XOM', 'CVX', 'ABBV', 'PFE',
-      'KO', 'AVGO', 'COST', 'MRK', 'PEP', 'TMO', 'ABT', 'CSCO', 'ACN', 'NKE', 'ADBE', 'TXN', 'CMCSA',
-      'NEE', 'LIN', 'PM', 'RTX', 'HON', 'QCOM', 'AMGN', 'BMY', 'UPS', 'SBUX', 'LOW', 'INTU', 'AMAT',
-      'DE', 'CAT', 'GE', 'GS', 'AXP', 'BLK', 'BKNG', 'ELV', 'TJX', 'MDT', 'GILD', 'ISRG', 'SYK',
-      'ZTS', 'ADP', 'CI', 'EQIX', 'APH', 'KLAC', 'CDNS', 'SNPS', 'MCHP', 'FTNT', 'ANET', 'CRWD',
-      'PANW', 'NET', 'DDOG', 'ZS', 'OKTA', 'TEAM', 'DOCN', 'ESTC', 'MDB', 'NOW', 'VEEV', 'WDAY',
-      'PLTR', 'SNOW', 'DDOG', 'RPD', 'FROG', 'ASAN', 'U', 'BILL', 'COUP', 'ZM', 'DOCU', 'CLOU',
-      'SPOT', 'ROKU', 'SQ', 'SHOP', 'ETSY', 'PINS', 'SNAP', 'TWTR', 'UBER', 'LYFT', 'DASH', 'ABNB',
-      'RBLX', 'HOOD', 'COIN', 'SOFI', 'AFRM', 'UPST', 'LC', 'OPEN', 'Z', 'RDFN', 'COMP', 'RKT'
-    ];
-    
-    const stocks = await Promise.all(
-      usStocks.map(async (symbol) => {
-        try {
-          const [quoteResponse, profileResponse] = await Promise.all([
-            axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`),
-            axios.get(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
-          ]);
-          const data = quoteResponse.data;
-          const profile = profileResponse.data;
-          
-          // Only include stocks with valid data and positive change
-          if (!data.c || data.dp === undefined) return null;
-          
-          return {
-            symbol,
-            name: profile.name || symbol,
-            price: data.c,
-            change: data.d,
-            changePercent: data.dp,
-            logo: profile.logo,
-          };
-        } catch (error) {
-          return null;
-        }
-      })
-    );
-
-    const validStocks = stocks.filter(Boolean);
-    const gainers = validStocks
-      .filter((stock) => stock.changePercent > 0 && stock.price > 0)
-      .sort((a, b) => b.changePercent - a.changePercent)
-      .slice(0, 20);
-
-    setCachedData(cacheKey, gainers);
-    res.json(gainers);
+    const snapshot = await getMarketMoversSnapshot();
+    res.json(snapshot.gainers);
   } catch (error) {
     console.error('Top gainers error:', error.message);
     res.status(500).json({ error: 'Failed to fetch top gainers' });
@@ -246,61 +301,8 @@ app.get('/api/market/gainers', async (req, res) => {
 // Get top losers
 app.get('/api/market/losers', async (req, res) => {
   try {
-    const cacheKey = 'top_losers';
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    // Expanded list of US stocks from major exchanges (NYSE, NASDAQ)
-    const usStocks = [
-      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'PYPL', 'CRM',
-      'JPM', 'V', 'JNJ', 'WMT', 'MA', 'DIS', 'PG', 'UNH', 'HD', 'BAC', 'XOM', 'CVX', 'ABBV', 'PFE',
-      'KO', 'AVGO', 'COST', 'MRK', 'PEP', 'TMO', 'ABT', 'CSCO', 'ACN', 'NKE', 'ADBE', 'TXN', 'CMCSA',
-      'NEE', 'LIN', 'PM', 'RTX', 'HON', 'QCOM', 'AMGN', 'BMY', 'UPS', 'SBUX', 'LOW', 'INTU', 'AMAT',
-      'DE', 'CAT', 'GE', 'GS', 'AXP', 'BLK', 'BKNG', 'ELV', 'TJX', 'MDT', 'GILD', 'ISRG', 'SYK',
-      'ZTS', 'ADP', 'CI', 'EQIX', 'APH', 'KLAC', 'CDNS', 'SNPS', 'MCHP', 'FTNT', 'ANET', 'CRWD',
-      'PANW', 'NET', 'DDOG', 'ZS', 'OKTA', 'TEAM', 'DOCN', 'ESTC', 'MDB', 'NOW', 'VEEV', 'WDAY',
-      'PLTR', 'SNOW', 'DDOG', 'RPD', 'FROG', 'ASAN', 'U', 'BILL', 'COUP', 'ZM', 'DOCU', 'CLOU',
-      'SPOT', 'ROKU', 'SQ', 'SHOP', 'ETSY', 'PINS', 'SNAP', 'TWTR', 'UBER', 'LYFT', 'DASH', 'ABNB',
-      'RBLX', 'HOOD', 'COIN', 'SOFI', 'AFRM', 'UPST', 'LC', 'OPEN', 'Z', 'RDFN', 'COMP', 'RKT'
-    ];
-    
-    const stocks = await Promise.all(
-      usStocks.map(async (symbol) => {
-        try {
-          const [quoteResponse, profileResponse] = await Promise.all([
-            axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`),
-            axios.get(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
-          ]);
-          const data = quoteResponse.data;
-          const profile = profileResponse.data;
-          
-          // Only include stocks with valid data and negative change
-          if (!data.c || data.dp === undefined) return null;
-          
-          return {
-            symbol,
-            name: profile.name || symbol,
-            price: data.c,
-            change: data.d,
-            changePercent: data.dp,
-            logo: profile.logo,
-          };
-        } catch (error) {
-          return null;
-        }
-      })
-    );
-
-    const validStocks = stocks.filter(Boolean);
-    const losers = validStocks
-      .filter((stock) => stock.changePercent < 0 && stock.price > 0)
-      .sort((a, b) => a.changePercent - b.changePercent)
-      .slice(0, 20);
-
-    setCachedData(cacheKey, losers);
-    res.json(losers);
+    const snapshot = await getMarketMoversSnapshot();
+    res.json(snapshot.losers);
   } catch (error) {
     console.error('Top losers error:', error.message);
     res.status(500).json({ error: 'Failed to fetch top losers' });
@@ -462,6 +464,5 @@ app.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`\n⚠️  Make sure to set your API keys in the .env file!`);
 });
-
 
 

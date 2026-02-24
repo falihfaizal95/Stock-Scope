@@ -27,6 +27,7 @@ export default function StockDetailScreen() {
   const [stock, setStock] = useState(null);
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [chartExpanded, setChartExpanded] = useState(false);
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
   const theme = useTheme();
@@ -40,6 +41,7 @@ export default function StockDetailScreen() {
   const fetchStockDetails = async () => {
     setLoading(true);
     setStock(null);
+    setErrorMessage('');
     try {
       const stockData = await stockAPI.getStockDetails(symbol);
       if (stockData && stockData.error) {
@@ -58,10 +60,12 @@ export default function StockDetailScreen() {
       } else {
         console.error('Invalid stock data:', stockData);
         setStock(null);
+        setErrorMessage('Stock data is unavailable');
       }
     } catch (error) {
       console.error('Error fetching stock details:', error);
       setStock(null);
+      setErrorMessage(error.message || 'Failed to load stock details');
     } finally {
       setLoading(false);
     }
@@ -93,7 +97,7 @@ export default function StockDetailScreen() {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
         <Text style={[styles.errorText, { color: theme.colors.error }]}>
-          Stock not found
+          {errorMessage || 'Stock not found'}
         </Text>
       </View>
     );

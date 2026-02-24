@@ -26,10 +26,11 @@ export const stockAPI = {
       return response.data;
     } catch (error) {
       console.error('Stock details error:', error);
+      const backendMessage = error.response?.data?.error;
       if (error.response && error.response.status === 404) {
-        throw new Error('Stock not found');
+        throw new Error(backendMessage || 'Stock not found');
       }
-      throw error;
+      throw new Error(backendMessage || 'Failed to load stock details');
     }
   },
 
@@ -112,6 +113,5 @@ export const newsAPI = {
     }
   },
 };
-
 
 
