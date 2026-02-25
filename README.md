@@ -1,6 +1,6 @@
 # StockScope 📈
 ------------------
-A modern, cross-platform stock analyzer and researcher app built with React Native and Node.js.
+A modern, cross-platform stock analyzer and researcher app built with React Native and Node.js. Encourages Trading Various U.S. Stocks through Paper Trading
 
 ## 🚀 Features
 
