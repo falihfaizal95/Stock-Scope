@@ -12,7 +12,7 @@ A modern, cross-platform stock analyzer and researcher app built with React Nati
 - **Authentication**: Secure login with Firebase Auth
 - **Cross-Platform**: iOS, Android, and Web support via Expo
 
-## 📱 Tech Stack
+## 📱 Tech Stack Used
 ------------------------
 ### Frontend
 - React Native + Expo
