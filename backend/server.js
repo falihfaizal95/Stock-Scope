@@ -307,6 +307,108 @@ app.get('/api/stock/:symbol/earnings', async (req, res) => {
   }
 });
 
+app.get('/api/stock/:symbol/candles', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const normalizedSymbol = String(symbol || '').toUpperCase();
+    const resolution = String(req.query.resolution || 'D').toUpperCase();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const from = Number(req.query.from) || (nowSec - 30 * 24 * 60 * 60);
+    const to = Number(req.query.to) || nowSec;
+
+    const validResolutions = new Set(['1', '5', '15', '30', '60', 'D', 'W', 'M']);
+    if (!validResolutions.has(resolution)) {
+      return res.status(400).json({ error: 'Invalid resolution. Use 1,5,15,30,60,D,W,M' });
+    }
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) {
+      return res.status(400).json({ error: 'Invalid from/to range' });
+    }
+
+    const cacheKey = `candles_${normalizedSymbol}_${resolution}_${from}_${to}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const stockCandleUrl = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(normalizedSymbol)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
+    const cryptoCandleUrl = `https://finnhub.io/api/v1/crypto/candle?symbol=${encodeURIComponent(`BINANCE:${normalizedSymbol}USDT`)}&resolution=${encodeURIComponent(resolution)}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`;
+
+    let response;
+    let isCryptoAsset = CRYPTO_SYMBOLS.has(normalizedSymbol);
+    try {
+      response = await axios.get(isCryptoAsset ? cryptoCandleUrl : stockCandleUrl);
+    } catch (error) {
+      if (!isCryptoAsset) {
+        try {
+          response = await axios.get(cryptoCandleUrl);
+          isCryptoAsset = true;
+        } catch (cryptoError) {
+          const status = getAxiosStatus(cryptoError) || getAxiosStatus(error);
+          if (status === 429) {
+            return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+          }
+          return res.json({
+            symbol: normalizedSymbol,
+            assetType: 'stock',
+            s: 'no_data',
+            c: [],
+            h: [],
+            l: [],
+            o: [],
+            t: [],
+            v: [],
+          });
+        }
+      } else {
+        const status = getAxiosStatus(error);
+        if (status === 429) {
+          return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+        }
+        return res.json({
+          symbol: normalizedSymbol,
+          assetType: 'crypto',
+          s: 'no_data',
+          c: [],
+          h: [],
+          l: [],
+          o: [],
+          t: [],
+          v: [],
+        });
+      }
+    }
+
+    const payload = response.data || {};
+    const candles = {
+      symbol: normalizedSymbol,
+      assetType: isCryptoAsset ? 'crypto' : 'stock',
+      s: payload.s || 'no_data',
+      c: Array.isArray(payload.c) ? payload.c : [],
+      h: Array.isArray(payload.h) ? payload.h : [],
+      l: Array.isArray(payload.l) ? payload.l : [],
+      o: Array.isArray(payload.o) ? payload.o : [],
+      t: Array.isArray(payload.t) ? payload.t : [],
+      v: Array.isArray(payload.v) ? payload.v : [],
+    };
+
+    setCachedData(cacheKey, candles);
+    res.json(candles);
+  } catch (error) {
+    console.error('Candles error:', error.message);
+    res.json({
+      symbol: String(req.params.symbol || '').toUpperCase(),
+      assetType: 'stock',
+      s: 'no_data',
+      c: [],
+      h: [],
+      l: [],
+      o: [],
+      t: [],
+      v: [],
+    });
+  }
+});
+
 app.get('/api/stock/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
@@ -446,7 +548,8 @@ app.get('/api/stock/:symbol', async (req, res) => {
       assetType: isCryptoAsset ? 'crypto' : 'stock',
     };
 
-    setCachedData(cacheKey, stockData);
+    // Keep quote-level cache short so portfolio valuation updates feel live.
+    cache.set(cacheKey, stockData, 20);
     res.json(stockData);
   } catch (error) {
     console.error('Stock details error:', error.message);
@@ -657,8 +760,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 StockScope API server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`\n⚠️  Make sure to set your API keys in the .env file!`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 StockScope API server running on port ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    console.log(`\n⚠️  Make sure to set your API keys in the .env file!`);
+  });
+}
+
+module.exports = app;

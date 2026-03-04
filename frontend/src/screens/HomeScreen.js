@@ -5,8 +5,9 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -17,22 +18,76 @@ import { usePortfolio } from '../context/PortfolioContext';
 import { useTheme } from 'react-native-paper';
 import StockScopeLogo from '../components/StockScopeLogo';
 
-const screenWidth = Dimensions.get('window').width;
+const RANGE_SECONDS = {
+  LIVE: 24 * 60 * 60,
+  '1D': 24 * 60 * 60,
+  '1W': 7 * 24 * 60 * 60,
+  '1M': 30 * 24 * 60 * 60,
+  '3M': 90 * 24 * 60 * 60,
+  '1Y': 365 * 24 * 60 * 60,
+  ALL: 5 * 365 * 24 * 60 * 60,
+};
+
+const PORTFOLIO_RANGE_CONFIG = {
+  LIVE: { resolution: '15', points: 24 },
+  '1D': { resolution: '15', points: 28 },
+  '1W': { resolution: '60', points: 36 },
+  '1M': { resolution: 'D', points: 42 },
+  '3M': { resolution: 'D', points: 48 },
+  YTD: { resolution: 'D', points: 56 },
+  '1Y': { resolution: 'W', points: 64 },
+  ALL: { resolution: 'M', points: 60 },
+};
+
+const getRangeStart = (range, nowSec) => {
+  if (range === 'YTD') {
+    const now = new Date(nowSec * 1000);
+    return Math.floor(new Date(now.getFullYear(), 0, 1).getTime() / 1000);
+  }
+  return nowSec - (RANGE_SECONDS[range] || RANGE_SECONDS['1D']);
+};
+
+const normalizeSeriesToLength = (values, targetLength, fallbackValue) => {
+  if (targetLength <= 0) return [];
+  const safeFallback = Number(fallbackValue || 0);
+  if (!Array.isArray(values) || values.length === 0) {
+    return Array.from({ length: targetLength }, () => safeFallback);
+  }
+  if (values.length === targetLength) {
+    return values.map((v) => Number(v ?? safeFallback));
+  }
+  return Array.from({ length: targetLength }, (_, index) => {
+    const sourceIndex = Math.round((index / Math.max(targetLength - 1, 1)) * (values.length - 1));
+    const value = values[sourceIndex];
+    return Number(value ?? safeFallback);
+  });
+};
 
 export default function HomeScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const [marketData, setMarketData] = useState(null);
   const [topGainers, setTopGainers] = useState([]);
   const [topLosers, setTopLosers] = useState([]);
   const [crypto, setCrypto] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPortfolioRange, setSelectedPortfolioRange] = useState('1D');
+  const [portfolioChartData, setPortfolioChartData] = useState([0]);
+  const [portfolioSeriesLoading, setPortfolioSeriesLoading] = useState(false);
+  const [liveIndicatorOn, setLiveIndicatorOn] = useState(true);
+  const [liveRefreshTick, setLiveRefreshTick] = useState(0);
+  const [hoveredPortfolioIndex, setHoveredPortfolioIndex] = useState(null);
   const navigation = useNavigation();
   const { watchlist } = useWatchlist();
-  const { portfolio } = usePortfolio();
+  const { portfolio, refreshPortfolioValuation } = usePortfolio();
   const theme = useTheme();
   const portfolioTotal = portfolio?.totalValue ?? portfolio?.cash ?? 0;
   const buyingPower = portfolio?.cash ?? 0;
   const positionCount = portfolio?.holdings?.length ?? 0;
+  const portfolioRanges = ['LIVE', '1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'];
+  const gridGap = 12;
+  const gridColumns = windowWidth >= 1700 ? 4 : windowWidth >= 1200 ? 3 : windowWidth >= 760 ? 2 : 1;
+  const cardWidth = (windowWidth - 32 - (gridColumns - 1) * gridGap) / gridColumns;
 
   useEffect(() => {
     fetchData();
@@ -40,6 +95,8 @@ export default function HomeScreen() {
 
   const fetchData = async () => {
     try {
+      refreshPortfolioValuation();
+
       // Fetch in parallel to reduce homepage load time.
       const [overviewResult, gainersResult, losersResult, cryptoResult] = await Promise.allSettled([
         stockAPI.getMarketOverview(),
@@ -130,7 +187,108 @@ export default function HomeScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
+    setLiveRefreshTick((tick) => tick + 1);
   };
+
+  useEffect(() => {
+    if (selectedPortfolioRange !== 'LIVE') {
+      setLiveIndicatorOn(false);
+      return;
+    }
+
+    setLiveIndicatorOn(true);
+    const blinkInterval = setInterval(() => {
+      setLiveIndicatorOn((prev) => !prev);
+    }, 550);
+    const refreshInterval = setInterval(() => {
+      setLiveRefreshTick((tick) => tick + 1);
+    }, 20000);
+
+    return () => {
+      clearInterval(blinkInterval);
+      clearInterval(refreshInterval);
+    };
+  }, [selectedPortfolioRange]);
+
+  useEffect(() => {
+    setHoveredPortfolioIndex(null);
+  }, [selectedPortfolioRange, portfolioChartData.length]);
+
+  useEffect(() => {
+    const holdings = Array.isArray(portfolio?.holdings) ? portfolio.holdings : [];
+    const config = PORTFOLIO_RANGE_CONFIG[selectedPortfolioRange] || PORTFOLIO_RANGE_CONFIG['1D'];
+    const targetPoints = config.points;
+    let canceled = false;
+
+    const buildPortfolioSeries = async () => {
+      const cashValue = Number((portfolio?.cash ?? 0).toFixed(2));
+      if (!holdings.length) {
+        const flatSeries = Array.from({ length: targetPoints }, () => cashValue);
+        if (!canceled) {
+          setPortfolioChartData(flatSeries);
+        }
+        return;
+      }
+
+      setPortfolioSeriesLoading(true);
+      try {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const from = getRangeStart(selectedPortfolioRange, nowSec);
+        const to = nowSec;
+
+        const seriesByHolding = await Promise.all(
+          holdings.map(async (holding) => {
+            const [candles, details] = await Promise.all([
+              stockAPI.getStockCandles(holding.symbol, {
+                resolution: config.resolution,
+                from,
+                to,
+              }),
+              stockAPI.getStockDetails(holding.symbol).catch(() => null),
+            ]);
+            return { holding, candles, livePrice: Number(details?.price) };
+          })
+        );
+
+        const totalSeries = Array.from({ length: targetPoints }, () => cashValue);
+        seriesByHolding.forEach(({ holding, candles, livePrice }) => {
+          const hasLivePrice = Number.isFinite(livePrice) && livePrice > 0;
+          const fallbackPrice = hasLivePrice ? livePrice : Number(holding.avgPrice || 0);
+          const closes = candles?.s === 'ok' && Array.isArray(candles?.c) ? candles.c : [];
+          const normalizedCloses = normalizeSeriesToLength(closes, targetPoints, fallbackPrice).map((price) =>
+            Number(price || fallbackPrice)
+          );
+          if (hasLivePrice && normalizedCloses.length > 0) {
+            normalizedCloses[normalizedCloses.length - 1] = livePrice;
+          }
+
+          normalizedCloses.forEach((price, index) => {
+            totalSeries[index] += Number(holding.shares || 0) * price;
+          });
+        });
+
+        const roundedSeries = totalSeries.map((value) => Number(value.toFixed(2)));
+        if (!canceled) {
+          setPortfolioChartData(roundedSeries);
+        }
+      } catch (error) {
+        console.error('Error building portfolio chart data:', error);
+        if (!canceled) {
+          const fallbackTotal = Number((portfolioTotal || cashValue).toFixed(2));
+          setPortfolioChartData(Array.from({ length: targetPoints }, () => fallbackTotal));
+        }
+      } finally {
+        if (!canceled) {
+          setPortfolioSeriesLoading(false);
+        }
+      }
+    };
+
+    buildPortfolioSeries();
+    return () => {
+      canceled = true;
+    };
+  }, [selectedPortfolioRange, portfolio?.cash, portfolio?.holdings, portfolioTotal, liveRefreshTick]);
 
   // Generate mock chart data for demonstration
   const generateChartData = (isPositive) => {
@@ -149,7 +307,7 @@ export default function HomeScreen() {
     const isPositive = stock.changePercent >= 0;
     const chartData = generateChartData(isPositive);
     const chartColor = isPositive ? theme.colors.positive : theme.colors.negative;
-    const cardWidth = (screenWidth - 48) / 3; // 3 cards per row with padding
+    const isEndOfRow = (index + 1) % gridColumns === 0;
 
     return (
       <TouchableOpacity
@@ -158,6 +316,7 @@ export default function HomeScreen() {
         style={[styles.stockCard, { 
           backgroundColor: theme.colors.surface,
           width: cardWidth,
+          marginRight: isEndOfRow ? 0 : gridGap,
         }]}
         activeOpacity={0.7}
       >
@@ -257,22 +416,54 @@ export default function HomeScreen() {
     );
   };
 
-  const getPortfolioChartData = () => {
-    const base = Math.max(portfolioTotal || 1000000, 1);
-    const points = 36;
-    const values = Array.from({ length: points }, (_, i) => {
-      const wave = Math.sin(i / 3.8) * 0.006 + Math.cos(i / 6.2) * 0.004;
-      const drift = (i / points) * 0.01;
-      return Number((base * (0.985 + drift + wave)).toFixed(2));
-    });
-    return values;
-  };
-
-  const portfolioChartData = getPortfolioChartData();
-  const portfolioStart = portfolioChartData[0] || portfolioTotal || 0;
-  const portfolioChange = portfolioTotal - portfolioStart;
+  const portfolioDisplayTotal = portfolioChartData[portfolioChartData.length - 1] ?? portfolioTotal;
+  const portfolioChartWidth = windowWidth - 72;
+  const portfolioChartHeight = 180;
+  const chartPointCount = portfolioChartData.length;
+  const nowMs = Date.now();
+  const fromMs = getRangeStart(selectedPortfolioRange, Math.floor(nowMs / 1000)) * 1000;
+  const portfolioTimestamps = Array.from({ length: chartPointCount }, (_, index) => {
+    if (chartPointCount <= 1) return new Date(nowMs);
+    const progress = index / (chartPointCount - 1);
+    return new Date(fromMs + (nowMs - fromMs) * progress);
+  });
+  const portfolioDisplayIndex = hoveredPortfolioIndex ?? Math.max(chartPointCount - 1, 0);
+  const portfolioDisplayPrice = portfolioChartData[portfolioDisplayIndex] ?? portfolioDisplayTotal;
+  const portfolioDisplayTime = portfolioTimestamps[portfolioDisplayIndex] ?? new Date();
+  const portfolioStart = portfolioChartData[0] || portfolioDisplayTotal || 0;
+  const portfolioChange = portfolioDisplayTotal - portfolioStart;
   const portfolioChangePct = portfolioStart > 0 ? (portfolioChange / portfolioStart) * 100 : 0;
   const portfolioPositive = portfolioChange >= 0;
+  const changePeriodLabel = selectedPortfolioRange === 'LIVE' || selectedPortfolioRange === '1D'
+    ? 'Today'
+    : selectedPortfolioRange;
+  const portfolioMin = Math.min(...portfolioChartData);
+  const portfolioMax = Math.max(...portfolioChartData);
+  const portfolioHoverX =
+    chartPointCount > 1 ? (portfolioDisplayIndex / (chartPointCount - 1)) * portfolioChartWidth : 0;
+  const portfolioHoverY =
+    portfolioMax === portfolioMin
+      ? portfolioChartHeight / 2
+      : portfolioChartHeight -
+        ((portfolioDisplayPrice - portfolioMin) / (portfolioMax - portfolioMin)) * (portfolioChartHeight - 12);
+
+  const formatPortfolioHoverTime = (date, range) => {
+    if (!date) return '';
+    if (range === 'LIVE' || range === '1D') {
+      return date.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+    if (range === '1W' || range === '1M' || range === '3M') {
+      return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const setPortfolioHoverFromX = (x) => {
+    if (chartPointCount <= 1) return;
+    const clampedX = Math.max(0, Math.min(portfolioChartWidth, x));
+    const index = Math.round((clampedX / portfolioChartWidth) * (chartPointCount - 1));
+    setHoveredPortfolioIndex(Math.max(0, Math.min(chartPointCount - 1, index)));
+  };
 
   if (loading) {
     return (
@@ -315,7 +506,7 @@ export default function HomeScreen() {
                 Individual
               </Text>
               <Text style={[styles.portfolioPrimaryValue, { color: theme.colors.text }]}>
-                ${portfolioTotal.toFixed(2)}
+                ${Number(portfolioDisplayPrice || portfolioDisplayTotal).toFixed(2)}
               </Text>
               <Text
                 style={[
@@ -325,12 +516,19 @@ export default function HomeScreen() {
               >
                 {portfolioPositive ? '+' : '-'}${Math.abs(portfolioChange).toFixed(2)} (
                 {portfolioPositive ? '+' : ''}
-                {portfolioChangePct.toFixed(2)}%) Today
+                {portfolioChangePct.toFixed(2)}%) {changePeriodLabel}
+              </Text>
+              <Text style={[styles.portfolioHoverLine, { color: theme.colors.placeholder }]}>
+                {formatPortfolioHoverTime(portfolioDisplayTime, selectedPortfolioRange)}
               </Text>
             </View>
-            <View style={[styles.portfolioBadge, { backgroundColor: '#f5be41' }]}>
+            <TouchableOpacity
+              style={[styles.portfolioBadge, { backgroundColor: '#f5be41' }]}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.75}
+            >
               <Text style={styles.portfolioBadgeText}>$1M pie</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.portfolioBigChartWrap}>
@@ -345,8 +543,8 @@ export default function HomeScreen() {
                   },
                 ],
               }}
-              width={screenWidth - 72}
-              height={180}
+              width={windowWidth - 72}
+              height={portfolioChartHeight}
               withDots={false}
               withShadow={false}
               withVerticalLines={false}
@@ -367,29 +565,114 @@ export default function HomeScreen() {
               bezier
               style={styles.portfolioChart}
             />
+            <View
+              style={[styles.portfolioChartInteractiveLayer, { width: portfolioChartWidth, height: portfolioChartHeight }]}
+              onStartShouldSetResponder={() => true}
+              onResponderGrant={(event) => setPortfolioHoverFromX(event.nativeEvent.locationX)}
+              onResponderMove={(event) => setPortfolioHoverFromX(event.nativeEvent.locationX)}
+              onResponderRelease={() => setHoveredPortfolioIndex(null)}
+              onResponderTerminate={() => setHoveredPortfolioIndex(null)}
+              {...(Platform.OS === 'web'
+                ? {
+                    onMouseMove: (event) => setPortfolioHoverFromX(event.nativeEvent.offsetX),
+                    onMouseLeave: () => setHoveredPortfolioIndex(null),
+                  }
+                : {})}
+            >
+              {hoveredPortfolioIndex !== null && (
+                <>
+                  <View
+                    style={[
+                      styles.portfolioCrosshair,
+                      { left: Math.max(0, Math.min(portfolioChartWidth - 1, portfolioHoverX)) },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.portfolioHoverDot,
+                      {
+                        left: Math.max(0, Math.min(portfolioChartWidth - 10, portfolioHoverX - 5)),
+                        top: Math.max(0, Math.min(portfolioChartHeight - 10, portfolioHoverY - 5)),
+                        backgroundColor: portfolioPositive ? theme.colors.positive : theme.colors.negative,
+                      },
+                    ]}
+                  />
+                </>
+              )}
+            </View>
           </View>
 
           <View style={[styles.portfolioTimeframeRow, { borderTopColor: theme.colors.border }]}>
-            {['LIVE', '1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'].map((label, index) => {
-              const active = label === '1D';
+            {portfolioRanges.map((label, index) => {
+              const active = label === selectedPortfolioRange;
               return (
-                <Text
+                <TouchableOpacity
                   key={label}
+                  onPress={() => setSelectedPortfolioRange(label)}
                   style={[
-                    styles.portfolioTimeframeText,
+                    styles.portfolioTimeframePill,
                     {
-                      color: active ? theme.colors.positive : theme.colors.text,
-                      marginRight: index === 7 ? 0 : 14,
+                      marginRight: index === portfolioRanges.length - 1 ? 0 : 8,
+                      backgroundColor: active ? 'rgba(52, 199, 89, 0.15)' : 'transparent',
                     },
                   ]}
+                  activeOpacity={0.75}
                 >
-                  {label}
-                </Text>
+                  <View style={styles.portfolioTimeframeInner}>
+                    <Text
+                      style={[
+                        styles.portfolioTimeframeText,
+                        { color: active ? theme.colors.positive : theme.colors.text },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                    {label === 'LIVE' && active && (
+                      <View
+                        style={[
+                          styles.liveDot,
+                          { opacity: liveIndicatorOn ? 1 : 0.2 },
+                        ]}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
               );
             })}
+            {portfolioSeriesLoading && (
+              <Text style={[styles.portfolioUpdatingText, { color: theme.colors.placeholder }]}>
+                Updating...
+              </Text>
+            )}
           </View>
 
-          <View style={[styles.buyingPowerRow, { borderTopColor: theme.colors.border }]}>
+          <View style={styles.portfolioActionsRow}>
+            <TouchableOpacity
+              style={[styles.portfolioActionButton, { backgroundColor: theme.colors.background, marginRight: 8 }]}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.portfolioActionText, { color: theme.colors.text }]}>
+                Portfolio breakdown
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.portfolioActionButton, { backgroundColor: theme.colors.background }]}
+              onPress={() => navigation.navigate('Search')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.portfolioActionText, { color: theme.colors.text }]}>
+                Trade
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.buyingPowerRow, { borderTopColor: theme.colors.border }]}
+            onPress={() => navigation.navigate('Search')}
+            activeOpacity={0.8}
+          >
             <View>
               <Text style={[styles.buyingPowerLabel, { color: theme.colors.text }]}>
                 Buying power
@@ -401,7 +684,7 @@ export default function HomeScreen() {
             <Text style={[styles.buyingPowerValue, { color: theme.colors.text }]}>
               ${buyingPower.toFixed(2)}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -486,7 +769,7 @@ export default function HomeScreen() {
                           },
                         ],
                       }}
-                      width={screenWidth - 120}
+                      width={windowWidth - 120}
                       height={60}
                       withDots={false}
                       withShadow={false}
@@ -622,7 +905,7 @@ const styles = StyleSheet.create({
   stockGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   stockCard: {
     padding: 12,
@@ -633,7 +916,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-    marginHorizontal: 2,
   },
   stockCardContent: {
     width: '100%',
@@ -749,6 +1031,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  portfolioHoverLine: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
+  },
   portfolioBadge: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -764,6 +1051,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   portfolioChart: {
     marginLeft: -10,
@@ -771,16 +1059,76 @@ const styles = StyleSheet.create({
     paddingRight: 0,
     paddingLeft: 0,
   },
+  portfolioChartInteractiveLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  portfolioCrosshair: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  portfolioHoverDot: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#0f172a',
+  },
   portfolioTimeframeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     paddingTop: 12,
     paddingBottom: 10,
     borderTopWidth: 1,
   },
+  portfolioTimeframePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  portfolioTimeframeInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   portfolioTimeframeText: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 6,
+    backgroundColor: '#ef4444',
+  },
+  portfolioUpdatingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  portfolioActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  portfolioActionButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  portfolioActionText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   buyingPowerRow: {
     borderTopWidth: 1,

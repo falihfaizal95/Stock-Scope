@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { useAuth } from './AuthContext';
+import { stockAPI } from '../utils/api';
 
 const PortfolioContext = createContext({});
 const STARTING_CASH = 1000000;
@@ -21,6 +22,7 @@ export const PortfolioProvider = ({ children }) => {
     cash: STARTING_CASH, // Starting fake money: $1,000,000
     holdings: [],
     totalValue: STARTING_CASH,
+    history: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,13 +40,22 @@ export const PortfolioProvider = ({ children }) => {
     try {
       const portfolioDoc = await getDoc(doc(db, 'portfolios', user.uid));
       if (portfolioDoc.exists()) {
-        setPortfolio(portfolioDoc.data());
+        const loadedPortfolio = {
+          cash: STARTING_CASH,
+          holdings: [],
+          totalValue: STARTING_CASH,
+          history: [],
+          ...portfolioDoc.data(),
+        };
+        setPortfolio(loadedPortfolio);
+        await refreshPortfolioValuation(loadedPortfolio);
       } else {
         // Initialize portfolio with $1,000,000 fake money
         const initialPortfolio = {
           cash: STARTING_CASH,
           holdings: [],
           totalValue: STARTING_CASH,
+          history: [{ value: STARTING_CASH, timestamp: new Date().toISOString() }],
         };
         await setDoc(doc(db, 'portfolios', user.uid), initialPortfolio);
         setPortfolio(initialPortfolio);
@@ -55,9 +66,22 @@ export const PortfolioProvider = ({ children }) => {
         if (typeof localStorage !== 'undefined') {
           const fallback = localStorage.getItem(getPortfolioFallbackKey(user.uid));
           if (fallback) {
-            setPortfolio(JSON.parse(fallback));
+            const localPortfolio = {
+              cash: STARTING_CASH,
+              holdings: [],
+              totalValue: STARTING_CASH,
+              history: [],
+              ...JSON.parse(fallback),
+            };
+            setPortfolio(localPortfolio);
+            await refreshPortfolioValuation(localPortfolio);
           } else {
-            setPortfolio({ cash: STARTING_CASH, holdings: [], totalValue: STARTING_CASH });
+            setPortfolio({
+              cash: STARTING_CASH,
+              holdings: [],
+              totalValue: STARTING_CASH,
+              history: [{ value: STARTING_CASH, timestamp: new Date().toISOString() }],
+            });
           }
         }
       } catch (fallbackError) {
@@ -67,6 +91,87 @@ export const PortfolioProvider = ({ children }) => {
       setLoading(false);
     }
   };
+
+  const getCurrentPrices = async (symbols = []) => {
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    if (uniqueSymbols.length === 0) return {};
+
+    const results = await Promise.allSettled(
+      uniqueSymbols.map(async (symbol) => {
+        const stock = await stockAPI.getStockDetails(symbol);
+        return { symbol, price: stock?.price };
+      })
+    );
+
+    return results.reduce((acc, result) => {
+      if (result.status !== 'fulfilled') return acc;
+      const { symbol, price } = result.value;
+      if (typeof price === 'number' && Number.isFinite(price)) {
+        acc[symbol] = price;
+      }
+      return acc;
+    }, {});
+  };
+
+  const buildValuatedPortfolio = async (basePortfolio) => {
+    const currentPrices = await getCurrentPrices((basePortfolio.holdings || []).map((h) => h.symbol));
+    let holdingsValue = 0;
+
+    const holdings = (basePortfolio.holdings || []).map((holding) => {
+      const currentPrice = currentPrices[holding.symbol] ?? holding.currentPrice ?? holding.avgPrice;
+      const marketValue = holding.shares * currentPrice;
+      const costBasis = holding.shares * (holding.avgPrice || 0);
+      const gainLossDollar = marketValue - costBasis;
+      const gainLossPercent = costBasis > 0 ? (gainLossDollar / costBasis) * 100 : 0;
+      holdingsValue += marketValue;
+
+      return {
+        ...holding,
+        currentPrice,
+        marketValue,
+        gainLossDollar,
+        gainLossPercent,
+      };
+    });
+
+    const totalValue = (basePortfolio.cash || 0) + holdingsValue;
+    const history = [...(basePortfolio.history || []), { value: totalValue, timestamp: new Date().toISOString() }]
+      .slice(-200);
+
+    return {
+      ...basePortfolio,
+      holdings,
+      totalValue,
+      history,
+    };
+  };
+
+  const refreshPortfolioValuation = async (sourcePortfolio = portfolio) => {
+    if (!user || !sourcePortfolio) return;
+
+    try {
+      const valuatedPortfolio = await buildValuatedPortfolio(sourcePortfolio);
+      setPortfolio(valuatedPortfolio);
+
+      try {
+        await updateDoc(doc(db, 'portfolios', user.uid), valuatedPortfolio);
+      } catch (error) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(valuatedPortfolio));
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing portfolio valuation:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const intervalId = setInterval(() => {
+      refreshPortfolioValuation();
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, [user, portfolio.cash, portfolio.holdings?.length]);
 
   const buyStock = async (symbol, shares, price) => {
     if (!user) return { success: false, error: 'Not logged in' };
@@ -102,7 +207,7 @@ export const PortfolioProvider = ({ children }) => {
       };
 
       await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
-      setPortfolio(updatedPortfolio);
+      await refreshPortfolioValuation(updatedPortfolio);
       
       return { success: true };
     } catch (error) {
@@ -127,7 +232,7 @@ export const PortfolioProvider = ({ children }) => {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
         }
-        setPortfolio(updatedPortfolio);
+        await refreshPortfolioValuation(updatedPortfolio);
         return { success: true, localOnly: true };
       } catch (fallbackError) {
         return { success: false, error: error.message || fallbackError.message };
@@ -162,7 +267,7 @@ export const PortfolioProvider = ({ children }) => {
       };
 
       await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
-      setPortfolio(updatedPortfolio);
+      await refreshPortfolioValuation(updatedPortfolio);
       
       return { success: true };
     } catch (error) {
@@ -187,7 +292,7 @@ export const PortfolioProvider = ({ children }) => {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
         }
-        setPortfolio(updatedPortfolio);
+        await refreshPortfolioValuation(updatedPortfolio);
         return { success: true, localOnly: true };
       } catch (fallbackError) {
         return { success: false, error: error.message || fallbackError.message };
@@ -213,6 +318,7 @@ export const PortfolioProvider = ({ children }) => {
     sellStock,
     calculateTotalValue,
     refreshPortfolio: loadPortfolio,
+    refreshPortfolioValuation,
   };
 
   return (
