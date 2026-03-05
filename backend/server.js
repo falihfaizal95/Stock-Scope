@@ -32,8 +32,114 @@ const MARKET_MOVER_SYMBOLS = [
 ];
 
 const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
+const DEMO_STOCKS = [
+  { symbol: 'AAPL', name: 'Apple Inc', price: 189.42, changePercent: 1.22, logo: null },
+  { symbol: 'MSFT', name: 'Microsoft Corp', price: 421.17, changePercent: 0.94, logo: null },
+  { symbol: 'NVDA', name: 'NVIDIA Corp', price: 903.11, changePercent: 2.11, logo: null },
+  { symbol: 'AMZN', name: 'Amazon.com Inc', price: 181.56, changePercent: -0.42, logo: null },
+  { symbol: 'GOOGL', name: 'Alphabet Inc', price: 172.98, changePercent: 0.35, logo: null },
+  { symbol: 'META', name: 'Meta Platforms', price: 531.83, changePercent: -0.68, logo: null },
+  { symbol: 'TSLA', name: 'Tesla Inc', price: 196.73, changePercent: 1.71, logo: null },
+  { symbol: 'AMD', name: 'Advanced Micro Devices', price: 171.24, changePercent: 1.38, logo: null },
+];
+const DEMO_NEWS = [
+  {
+    title: 'Markets mixed as investors track rates and earnings',
+    description: 'U.S. equities traded in a narrow range as investors weighed inflation and corporate updates.',
+    source: 'StockScope',
+    url: 'https://www.cnbc.com/markets/',
+    publishedAt: new Date().toISOString(),
+    imageUrl: null,
+    content: 'Demo fallback news while provider APIs recover.',
+    author: 'StockScope',
+  },
+  {
+    title: 'Tech stocks lead after strong AI demand outlook',
+    description: 'Large-cap technology names outperformed on renewed AI infrastructure spending momentum.',
+    source: 'StockScope',
+    url: 'https://www.reuters.com/markets/',
+    publishedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    imageUrl: null,
+    content: 'Demo fallback news while provider APIs recover.',
+    author: 'StockScope',
+  },
+  {
+    title: 'Energy and financials hold steady ahead of economic data',
+    description: 'Sector rotation remained balanced as traders awaited fresh macroeconomic releases.',
+    source: 'StockScope',
+    url: 'https://www.bloomberg.com/markets',
+    publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    imageUrl: null,
+    content: 'Demo fallback news while provider APIs recover.',
+    author: 'StockScope',
+  },
+];
 
 const getAxiosStatus = (error) => error?.response?.status;
+const isProviderAuthError = (error) => {
+  const status = getAxiosStatus(error);
+  return status === 401 || status === 403;
+};
+const getDemoOverview = () => ({
+  sp500: 5238.2,
+  sp500Change: 0.44,
+  nasdaq: 18204.7,
+  nasdaqChange: 0.61,
+  timestamp: new Date().toISOString(),
+  stale: true,
+});
+const getDemoMovers = () => {
+  const sorted = [...DEMO_STOCKS].sort((a, b) => b.changePercent - a.changePercent);
+  return {
+    gainers: sorted.filter((stock) => stock.changePercent >= 0).slice(0, 10),
+    losers: sorted.filter((stock) => stock.changePercent < 0).slice(0, 10),
+  };
+};
+const getDemoSearchResults = (query) => {
+  const normalized = String(query || '').trim().toUpperCase();
+  return DEMO_STOCKS.filter((stock) =>
+    stock.symbol.includes(normalized) || stock.name.toUpperCase().includes(normalized)
+  ).map((stock) => ({
+    symbol: stock.symbol,
+    name: stock.name,
+    type: 'Common Stock',
+    price: stock.price,
+    changePercent: stock.changePercent,
+    logo: stock.logo,
+    stale: true,
+  }));
+};
+const getDemoStockData = (symbol) => {
+  const normalized = String(symbol || '').toUpperCase();
+  const match = DEMO_STOCKS.find((stock) => stock.symbol === normalized);
+  if (!match) return null;
+  return {
+    symbol: normalized,
+    name: match.name,
+    price: match.price,
+    change: Number((match.price * (match.changePercent / 100)).toFixed(2)),
+    changePercent: match.changePercent,
+    open: match.price * 0.995,
+    high: match.price * 1.012,
+    low: match.price * 0.988,
+    previousClose: match.price * 0.99,
+    volume: 12500000,
+    marketCap: 2000000000000,
+    week52High: match.price * 1.22,
+    week52Low: match.price * 0.76,
+    logo: match.logo,
+    exchange: 'NASDAQ',
+    industry: 'Technology',
+    country: 'US',
+    currency: 'USD',
+    ipo: '1980-12-12',
+    website: null,
+    phone: null,
+    shareOutstanding: 10000000,
+    assetType: 'stock',
+    stale: true,
+  };
+};
 
 const buildFinnhubQuoteUrl = (symbol) =>
   `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`;
@@ -228,6 +334,9 @@ app.get('/api/stock/search', async (req, res) => {
     res.json(results);
   } catch (error) {
     console.error('Search error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(getDemoSearchResults(req.query?.q));
+    }
     res.status(500).json({ error: 'Failed to search stocks' });
   }
 });
@@ -441,6 +550,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
             }
             return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
           }
+          if (isProviderAuthError(cryptoError)) {
+            const demoFallback = getDemoStockData(normalizedSymbol);
+            if (demoFallback) return res.json(demoFallback);
+          }
           return res.status(404).json({ error: 'Asset not found' });
         }
       } else {
@@ -452,6 +565,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
             return res.json(cachedFallback);
           }
           return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
+        }
+        if (isProviderAuthError(error)) {
+          const demoFallback = getDemoStockData(normalizedSymbol);
+          if (demoFallback) return res.json(demoFallback);
         }
         return res.status(404).json({ error: 'Stock not found' });
       }
@@ -497,11 +614,17 @@ app.get('/api/stock/:symbol', async (req, res) => {
           }
           return res.status(429).json({ error: 'Market data provider rate limit exceeded. Please try again shortly.' });
         }
+        if (isProviderAuthError(error)) {
+          const demoFallback = getDemoStockData(normalizedSymbol);
+          if (demoFallback) return res.json(demoFallback);
+        }
       }
     }
 
     const finalQuote = quoteResponse?.data;
     if (!finalQuote || finalQuote.c === undefined || finalQuote.c === null) {
+      const demoFallback = getDemoStockData(normalizedSymbol);
+      if (demoFallback) return res.json(demoFallback);
       return res.status(404).json({ error: isCryptoAsset ? 'Crypto data not available' : 'Stock data not available' });
     }
 
@@ -584,6 +707,9 @@ app.get('/api/market/overview', async (req, res) => {
     res.json(overview);
   } catch (error) {
     console.error('Market overview error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(getDemoOverview());
+    }
     res.status(500).json({ error: 'Failed to fetch market overview' });
   }
 });
@@ -595,6 +721,9 @@ app.get('/api/market/gainers', async (req, res) => {
     res.json(snapshot.gainers);
   } catch (error) {
     console.error('Top gainers error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(getDemoMovers().gainers);
+    }
     res.status(500).json({ error: 'Failed to fetch top gainers' });
   }
 });
@@ -606,6 +735,9 @@ app.get('/api/market/losers', async (req, res) => {
     res.json(snapshot.losers);
   } catch (error) {
     console.error('Top losers error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(getDemoMovers().losers);
+    }
     res.status(500).json({ error: 'Failed to fetch top losers' });
   }
 });
@@ -639,6 +771,9 @@ app.get('/api/news', async (req, res) => {
     res.json(news);
   } catch (error) {
     console.error('News error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(DEMO_NEWS);
+    }
     res.status(500).json({ error: 'Failed to fetch news' });
   }
 });
@@ -718,6 +853,9 @@ app.get('/api/news/wsj', async (req, res) => {
     res.json(news);
   } catch (error) {
     console.error('WSJ news error:', error.message);
+    if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
+      return res.json(DEMO_NEWS);
+    }
     res.status(500).json({ error: 'Failed to fetch WSJ news' });
   }
 });
@@ -757,6 +895,10 @@ app.get('/api/news/:symbol', async (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

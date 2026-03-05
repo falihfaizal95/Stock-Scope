@@ -17,6 +17,7 @@ const screenWidth = Dimensions.get('window').width;
 
 export default function NewsScreen() {
   const [news, setNews] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
@@ -29,9 +30,12 @@ export default function NewsScreen() {
   const fetchNews = async () => {
     try {
       const data = await newsAPI.getNewsFeed();
-      setNews(data);
+      setNews(Array.isArray(data) ? data : []);
+      setErrorMessage('');
     } catch (error) {
       console.error('Error fetching news:', error);
+      setErrorMessage('Unable to load live news right now. Pull to retry.');
+      setNews([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,6 +115,15 @@ export default function NewsScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {news.length === 0 && (
+        <View style={styles.emptyState}>
+          <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No news available</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.colors.placeholder }]}>
+            {errorMessage || 'Try refreshing in a moment.'}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -202,5 +215,20 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

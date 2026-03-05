@@ -25,6 +25,7 @@ export default function SearchScreen() {
   const [topLosers, setTopLosers] = useState([]);
   const [wsjNews, setWsjNews] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [initialDataError, setInitialDataError] = useState('');
   const navigation = useNavigation();
   const theme = useTheme();
 
@@ -57,8 +58,13 @@ export default function SearchScreen() {
       setTopGainers(gainers.slice(0, 5));
       setTopLosers(losers.slice(0, 5));
       setWsjNews(news.slice(0, 3));
+      setInitialDataError('');
     } catch (error) {
       console.error('Error fetching initial data:', error);
+      setTopGainers([]);
+      setTopLosers([]);
+      setWsjNews([]);
+      setInitialDataError('Unable to load market feed right now.');
     } finally {
       setLoadingData(false);
     }
@@ -407,6 +413,17 @@ export default function SearchScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          )}
+
+          {topGainers.length === 0 && topLosers.length === 0 && wsjNews.length === 0 && (
+            <View style={styles.centerContainer}>
+              <Text style={[styles.noResultsText, { color: theme.colors.text }]}>
+                Market feed unavailable
+              </Text>
+              <Text style={[styles.noResultsSubtext, { color: theme.colors.placeholder }]}>
+                {initialDataError || 'Pull to refresh and try again.'}
+              </Text>
             </View>
           )}
         </ScrollView>

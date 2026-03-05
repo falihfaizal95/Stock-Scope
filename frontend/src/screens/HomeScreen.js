@@ -721,6 +721,19 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {topGainers.length === 0 && topLosers.length === 0 && crypto.length === 0 && (
+        <View style={styles.section}>
+          <View style={[styles.emptyMarketCard, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.emptyMarketTitle, { color: theme.colors.text }]}>
+              Market data temporarily unavailable
+            </Text>
+            <Text style={[styles.emptyMarketSubtitle, { color: theme.colors.placeholder }]}>
+              Pull to refresh. If you are on Vercel, check provider API key status.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {watchlist.length > 0 && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -981,6 +994,19 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  emptyMarketCard: {
+    borderRadius: 14,
+    padding: 18,
+  },
+  emptyMarketTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  emptyMarketSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   portfolioCard: {
     marginHorizontal: 16,
