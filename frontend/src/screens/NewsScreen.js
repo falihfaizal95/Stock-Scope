@@ -14,6 +14,11 @@ import { newsAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
 const screenWidth = Dimensions.get('window').width;
+const DEFAULT_NEWS_IMAGES = [
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
+];
 
 export default function NewsScreen() {
   const [news, setNews] = useState([]);
@@ -76,15 +81,18 @@ export default function NewsScreen() {
 
       <View style={styles.newsGrid}>
         {news.map((article, index) => (
+          (() => {
+            const imageUri = article.imageUrl || DEFAULT_NEWS_IMAGES[index % DEFAULT_NEWS_IMAGES.length];
+            return (
           <TouchableOpacity
             key={index}
             style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
             activeOpacity={0.8}
             onPress={() => navigation.navigate('NewsDetail', { article })}
           >
-            {article.imageUrl ? (
+            {imageUri ? (
               <Image
-                source={{ uri: article.imageUrl }}
+                source={{ uri: imageUri }}
                 style={styles.newsImage}
                 resizeMode="cover"
                 onError={() => {}}
@@ -113,6 +121,8 @@ export default function NewsScreen() {
               </View>
             </View>
           </TouchableOpacity>
+            );
+          })()
         ))}
       </View>
 

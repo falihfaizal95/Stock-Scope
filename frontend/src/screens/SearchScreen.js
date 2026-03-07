@@ -12,7 +12,7 @@ import {
 import { Text, Searchbar, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import { stockAPI, newsAPI } from '../utils/api';
+import { stockAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
 const screenWidth = Dimensions.get('window').width;
@@ -23,7 +23,7 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [topGainers, setTopGainers] = useState([]);
   const [topLosers, setTopLosers] = useState([]);
-  const [wsjNews, setWsjNews] = useState([]);
+  const [cryptoMovers, setCryptoMovers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [initialDataError, setInitialDataError] = useState('');
   const navigation = useNavigation();
@@ -50,20 +50,20 @@ export default function SearchScreen() {
   const fetchInitialData = async () => {
     setLoadingData(true);
     try {
-      const [gainers, losers, news] = await Promise.all([
+      const [gainers, losers, crypto] = await Promise.all([
         stockAPI.getTopGainers(),
         stockAPI.getTopLosers(),
-        newsAPI.getWSJNews(),
+        stockAPI.getCrypto(),
       ]);
       setTopGainers(gainers.slice(0, 5));
       setTopLosers(losers.slice(0, 5));
-      setWsjNews(news.slice(0, 3));
+      setCryptoMovers((crypto || []).slice(0, 5));
       setInitialDataError('');
     } catch (error) {
       console.error('Error fetching initial data:', error);
       setTopGainers([]);
       setTopLosers([]);
-      setWsjNews([]);
+      setCryptoMovers([]);
       setInitialDataError('Unable to load market feed right now.');
     } finally {
       setLoadingData(false);
@@ -312,6 +312,15 @@ export default function SearchScreen() {
     );
   };
 
+  const popularEtfs = [
+    { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
+    { symbol: 'SPY', name: 'S&P 500 ETF' },
+    { symbol: 'IWM', name: 'Russell 2000 ETF' },
+    { symbol: 'DIA', name: 'Dow Jones ETF' },
+    { symbol: 'VTI', name: 'Total Market ETF' },
+    { symbol: 'ARKK', name: 'Innovation ETF' },
+  ];
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.searchContainer}>
@@ -393,30 +402,37 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {wsjNews.length > 0 && (
+          {cryptoMovers.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Market News (WSJ)
+                Crypto Movers (24h)
               </Text>
-              {wsjNews.map((article, index) => (
+              {cryptoMovers.map((coin) => renderStockCard(coin, true))}
+            </View>
+          )}
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Popular ETFs
+            </Text>
+            <View style={styles.etfGrid}>
+              {popularEtfs.map((etf) => (
                 <TouchableOpacity
-                  key={index}
-                  style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
+                  key={etf.symbol}
+                  style={[styles.etfChip, { backgroundColor: theme.colors.surface }]}
+                  onPress={() => handleStockPress(etf.symbol)}
                   activeOpacity={0.7}
-                  onPress={() => navigation.navigate('NewsDetail', { article })}
                 >
-                  <Text style={[styles.newsTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                    {article.title}
-                  </Text>
-                  <Text style={[styles.newsSource, { color: theme.colors.primary }]}>
-                    {article.source} • {new Date(article.publishedAt).toLocaleDateString()}
+                  <Text style={[styles.etfSymbol, { color: theme.colors.text }]}>{etf.symbol}</Text>
+                  <Text style={[styles.etfName, { color: theme.colors.placeholder }]} numberOfLines={1}>
+                    {etf.name}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          )}
+          </View>
 
-          {topGainers.length === 0 && topLosers.length === 0 && wsjNews.length === 0 && (
+          {topGainers.length === 0 && topLosers.length === 0 && cryptoMovers.length === 0 && (
             <View style={styles.centerContainer}>
               <Text style={[styles.noResultsText, { color: theme.colors.text }]}>
                 Market feed unavailable
@@ -553,19 +569,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  newsCard: {
-    padding: 16,
-    marginBottom: 12,
+  etfGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  etfChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 12,
+    minWidth: 170,
   },
-  newsTitle: {
+  etfSymbol: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    lineHeight: 22,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  newsSource: {
-    fontSize: 13,
-    fontWeight: '500',
+  etfName: {
+    fontSize: 12,
   },
 });

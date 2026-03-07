@@ -33,16 +33,16 @@ const MARKET_MOVER_SYMBOLS = [
 
 const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
 const DEMO_STOCKS = [
-  { symbol: 'QQQ', name: 'Invesco QQQ Trust', price: 489.12, changePercent: 0.57, logo: null },
-  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', price: 532.46, changePercent: 0.41, logo: null },
-  { symbol: 'AAPL', name: 'Apple Inc', price: 189.42, changePercent: 1.22, logo: null },
-  { symbol: 'MSFT', name: 'Microsoft Corp', price: 421.17, changePercent: 0.94, logo: null },
-  { symbol: 'NVDA', name: 'NVIDIA Corp', price: 903.11, changePercent: 2.11, logo: null },
-  { symbol: 'AMZN', name: 'Amazon.com Inc', price: 181.56, changePercent: -0.42, logo: null },
-  { symbol: 'GOOGL', name: 'Alphabet Inc', price: 172.98, changePercent: 0.35, logo: null },
-  { symbol: 'META', name: 'Meta Platforms', price: 531.83, changePercent: -0.68, logo: null },
-  { symbol: 'TSLA', name: 'Tesla Inc', price: 196.73, changePercent: 1.71, logo: null },
-  { symbol: 'AMD', name: 'Advanced Micro Devices', price: 171.24, changePercent: 1.38, logo: null },
+  { symbol: 'QQQ', name: 'Invesco QQQ Trust', price: 489.12, changePercent: 0.57, logo: 'https://logo.clearbit.com/invesco.com' },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', price: 532.46, changePercent: 0.41, logo: 'https://logo.clearbit.com/ssga.com' },
+  { symbol: 'AAPL', name: 'Apple Inc', price: 189.42, changePercent: 1.22, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AAPL.png' },
+  { symbol: 'MSFT', name: 'Microsoft Corp', price: 421.17, changePercent: 0.94, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/MSFT.png' },
+  { symbol: 'NVDA', name: 'NVIDIA Corp', price: 903.11, changePercent: 2.11, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/NVDA.png' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc', price: 181.56, changePercent: -0.42, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AMZN.png' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc', price: 172.98, changePercent: 0.35, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/GOOGL.png' },
+  { symbol: 'META', name: 'Meta Platforms', price: 531.83, changePercent: -0.68, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/META.png' },
+  { symbol: 'TSLA', name: 'Tesla Inc', price: 196.73, changePercent: 1.71, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/TSLA.png' },
+  { symbol: 'AMD', name: 'Advanced Micro Devices', price: 171.24, changePercent: 1.38, logo: 'https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AMD.png' },
 ];
 const DEMO_NEWS = [
   {
@@ -51,7 +51,7 @@ const DEMO_NEWS = [
     source: 'StockScope',
     url: 'https://www.cnbc.com/markets/',
     publishedAt: new Date().toISOString(),
-    imageUrl: null,
+    imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a?auto=format&fit=crop&w=1200&q=80',
     content: 'Demo fallback news while provider APIs recover.',
     author: 'StockScope',
   },
@@ -61,7 +61,7 @@ const DEMO_NEWS = [
     source: 'StockScope',
     url: 'https://www.reuters.com/markets/',
     publishedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    imageUrl: null,
+    imageUrl: 'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&w=1200&q=80',
     content: 'Demo fallback news while provider APIs recover.',
     author: 'StockScope',
   },
@@ -71,7 +71,7 @@ const DEMO_NEWS = [
     source: 'StockScope',
     url: 'https://www.bloomberg.com/markets',
     publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    imageUrl: null,
+    imageUrl: 'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
     content: 'Demo fallback news while provider APIs recover.',
     author: 'StockScope',
   },
