@@ -132,14 +132,33 @@ const DEFAULT_NEWS_IMAGES = [
   'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80',
 ];
+const TRUSTED_NEWS_IMAGE_HOSTS = new Set([
+  'images.unsplash.com',
+  'images.pexels.com',
+  'cdn.pixabay.com',
+  'i.imgur.com',
+  'static2.finnhub.io',
+]);
 
 const normalizeNewsArticle = (article, index) => {
   if (!article || !article.title || article.title === '[Removed]') return null;
   const rawImage = article.urlToImage || article.image || article.imageUrl;
-  const imageUrl = typeof rawImage === 'string' && rawImage.startsWith('http')
-    ? rawImage
-    : DEFAULT_NEWS_IMAGES[index % DEFAULT_NEWS_IMAGES.length];
+  let imageUrl = DEFAULT_NEWS_IMAGES[index % DEFAULT_NEWS_IMAGES.length];
+  if (typeof rawImage === 'string' && rawImage.startsWith('http')) {
+    try {
+      const host = new URL(rawImage).hostname.replace(/^www\./, '');
+      if (TRUSTED_NEWS_IMAGE_HOSTS.has(host)) {
+        imageUrl = rawImage;
+      }
+    } catch (error) {
+      // keep fallback
+    }
+  }
   return {
     title: article.title,
     description: article.description || '',
@@ -150,6 +169,18 @@ const normalizeNewsArticle = (article, index) => {
     content: article.content || article.summary || '',
     author: article.author || null,
   };
+};
+const buildExtendedDemoNews = (targetCount = 24) => {
+  const extended = [];
+  for (let i = 0; i < targetCount; i += 1) {
+    const seed = DEMO_NEWS[i % DEMO_NEWS.length];
+    extended.push({
+      ...seed,
+      url: `${seed.url}${seed.url.includes('?') ? '&' : '?'}demo=${i + 1}`,
+      publishedAt: new Date(Date.now() - i * 45 * 60 * 1000).toISOString(),
+    });
+  }
+  return extended;
 };
 
 const getAxiosStatus = (error) => error?.response?.status;
@@ -849,16 +880,16 @@ app.get('/api/news', async (req, res) => {
 
     // Using NewsAPI
     const response = await axios.get(
-      `https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=20&apiKey=${NEWS_API_KEY}`
+      `https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=50&apiKey=${NEWS_API_KEY}`
     );
 
     const mapped = (Array.isArray(response.data?.articles) ? response.data.articles : [])
       .map((article, index) => normalizeNewsArticle(article, index))
       .filter(Boolean);
     const news = [...mapped];
-    DEMO_NEWS.forEach((demoArticle, index) => {
-      if (news.length >= 12) return;
-      if (!news.some((item) => item.title === demoArticle.title)) {
+    buildExtendedDemoNews(24).forEach((demoArticle, index) => {
+      if (news.length >= 24) return;
+      if (!news.some((item) => item.url === demoArticle.url)) {
         news.push(normalizeNewsArticle(demoArticle, mapped.length + index));
       }
     });
@@ -868,7 +899,7 @@ app.get('/api/news', async (req, res) => {
   } catch (error) {
     console.error('News error:', error.message);
     if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
-      return res.json(DEMO_NEWS);
+      return res.json(buildExtendedDemoNews(24).map((article, index) => normalizeNewsArticle(article, index)));
     }
     res.status(500).json({ error: 'Failed to fetch news' });
   }

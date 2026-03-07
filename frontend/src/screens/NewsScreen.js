@@ -67,7 +67,9 @@ export default function NewsScreen() {
     const key = `${article.url || article.title || index}_${index}`;
     const fallbackIndexOffset = imageErrorMap[key] || 0;
     const fallbackImage = DEFAULT_NEWS_IMAGES[(index + fallbackIndexOffset) % DEFAULT_NEWS_IMAGES.length];
-    const primaryImage = article.imageUrl || fallbackImage;
+    const primaryImage = fallbackIndexOffset > 0
+      ? fallbackImage
+      : (article.imageUrl || fallbackImage);
     return { imageUri: primaryImage, imageKey: key };
   };
 
