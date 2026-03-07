@@ -1,6 +1,21 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const getApiBaseUrl = () => {
+  const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envBase) return envBase;
+
+  if (typeof window !== 'undefined') {
+    const { hostname, origin } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3000/api';
+    }
+    return `${origin}/api`;
+  }
+
+  return 'http://localhost:3000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const stockAPI = {
   // Search for stocks
@@ -51,6 +66,18 @@ export const stockAPI = {
     } catch (error) {
       console.error('Stock earnings error:', error);
       return [];
+    }
+  },
+
+  getStockCandles: async (symbol, params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/stock/${symbol}/candles`, {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Stock candles error:', error);
+      return { s: 'no_data', c: [], t: [] };
     }
   },
 
@@ -133,4 +160,3 @@ export const newsAPI = {
     }
   },
 };
-
