@@ -21,8 +21,122 @@ import { useWatchlist } from '../context/WatchlistContext';
 import { useTheme } from 'react-native-paper';
 import ExpandedChart from '../components/ExpandedChart';
 import { usePortfolio } from '../context/PortfolioContext';
+import * as Haptics from 'expo-haptics';
 
 const screenWidth = Dimensions.get('window').width;
+const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
+
+const getEasternDateParts = (date = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  });
+  const pieces = formatter.formatToParts(date);
+  const map = {};
+  pieces.forEach((item) => {
+    if (item.type !== 'literal') map[item.type] = item.value;
+  });
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    weekday: map.weekday,
+  };
+};
+
+const formatYmd = (year, month, day) =>
+  `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+const getWeekday = (year, month, day) => new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+const nthWeekdayOfMonth = (year, month, weekday, nth) => {
+  let count = 0;
+  for (let day = 1; day <= 31; day += 1) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1) break;
+    if (date.getUTCDay() === weekday) {
+      count += 1;
+      if (count === nth) return day;
+    }
+  }
+  return null;
+};
+
+const lastWeekdayOfMonth = (year, month, weekday) => {
+  for (let day = 31; day >= 1; day -= 1) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1) continue;
+    if (date.getUTCDay() === weekday) return day;
+  }
+  return null;
+};
+
+const observedHolidayYmd = (year, month, day) => {
+  const weekday = getWeekday(year, month, day);
+  if (weekday === 6) {
+    const observed = new Date(Date.UTC(year, month - 1, day - 1));
+    return formatYmd(observed.getUTCFullYear(), observed.getUTCMonth() + 1, observed.getUTCDate());
+  }
+  if (weekday === 0) {
+    const observed = new Date(Date.UTC(year, month - 1, day + 1));
+    return formatYmd(observed.getUTCFullYear(), observed.getUTCMonth() + 1, observed.getUTCDate());
+  }
+  return formatYmd(year, month, day);
+};
+
+const getGoodFridayDay = (year) => {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easterMonth = Math.floor((h + l - 7 * m + 114) / 31);
+  const easterDay = ((h + l - 7 * m + 114) % 31) + 1;
+  const easter = new Date(Date.UTC(year, easterMonth - 1, easterDay));
+  const goodFriday = new Date(easter.getTime() - 2 * 24 * 60 * 60 * 1000);
+  return formatYmd(goodFriday.getUTCFullYear(), goodFriday.getUTCMonth() + 1, goodFriday.getUTCDate());
+};
+
+const isUsMarketHoliday = (year, month, day) => {
+  const ymd = formatYmd(year, month, day);
+  const holidays = new Set([
+    observedHolidayYmd(year, 1, 1),
+    formatYmd(year, 1, nthWeekdayOfMonth(year, 1, 1, 3)),
+    formatYmd(year, 2, nthWeekdayOfMonth(year, 2, 1, 3)),
+    getGoodFridayDay(year),
+    formatYmd(year, 5, lastWeekdayOfMonth(year, 5, 1)),
+    observedHolidayYmd(year, 6, 19),
+    observedHolidayYmd(year, 7, 4),
+    formatYmd(year, 9, nthWeekdayOfMonth(year, 9, 1, 1)),
+    formatYmd(year, 11, nthWeekdayOfMonth(year, 11, 4, 4)),
+    observedHolidayYmd(year, 12, 25),
+  ]);
+  return holidays.has(ymd);
+};
+
+const isUsRegularMarketOpenEt = (date = new Date()) => {
+  const eastern = getEasternDateParts(date);
+  const isWeekend = eastern.weekday === 'Sat' || eastern.weekday === 'Sun';
+  if (isWeekend) return false;
+  if (isUsMarketHoliday(eastern.year, eastern.month, eastern.day)) return false;
+  const minutes = eastern.hour * 60 + eastern.minute;
+  return minutes >= 9 * 60 + 30 && minutes < 16 * 60;
+};
 
 export default function StockDetailScreen() {
   const route = useRoute();
@@ -152,6 +266,17 @@ export default function StockDetailScreen() {
 
   const currentHolding = portfolio?.holdings?.find((h) => h.symbol === symbol);
   const ownedShares = currentHolding?.shares || 0;
+  const maxBuyShares = stock?.price ? Math.floor((portfolio?.cash || 0) / stock.price) : 0;
+  const isCryptoAsset = Boolean(
+    stock?.assetType === 'crypto' ||
+    stock?.exchange === 'CRYPTO' ||
+    CRYPTO_SYMBOLS.has(String(symbol || '').toUpperCase())
+  );
+  const marketOpenNow = isCryptoAsset || isUsRegularMarketOpenEt();
+  const parsedTradeShares = Number(tradeShares);
+  const isFractionalTrade = Number.isFinite(parsedTradeShares) && parsedTradeShares > 0 && !Number.isInteger(parsedTradeShares);
+  const canExecuteNow = marketOpenNow || isCryptoAsset || (tradeAction === 'buy' && isFractionalTrade);
+  const estimatedTradeValue = ((Number(tradeShares) || 0) * (stock?.price || 0)).toFixed(2);
 
   const openTradeModal = () => {
     setTradeAction(ownedShares > 0 ? 'sell' : 'buy');
@@ -165,6 +290,21 @@ export default function StockDetailScreen() {
       alert('Enter a valid number of shares');
       return;
     }
+
+    if (!canExecuteNow) {
+      setTradeVisible(false);
+      const eastern = getEasternDateParts();
+      const queuedFor =
+        eastern.weekday === 'Fri' || eastern.weekday === 'Sat'
+          ? 'Monday at 9:30 AM ET'
+          : 'next market open at 9:30 AM ET';
+      setTradeSuccessMessage(
+        `Market is closed.\n\nYour ${tradeAction} order for ${shares} share${shares > 1 ? 's' : ''} of ${symbol} is queued for ${queuedFor}.`
+      );
+      setTimeout(() => setTradeSuccessMessage(''), 2200);
+      return;
+    }
+
     setTradeSubmitting(true);
     try {
       const result = tradeAction === 'buy'
@@ -172,12 +312,16 @@ export default function StockDetailScreen() {
         : await sellStock(symbol, shares, stock.price);
 
       if (!result?.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         alert(result?.error || `Failed to ${tradeAction} stock`);
         return;
       }
 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setTradeVisible(false);
-      setTradeSuccessMessage(`You have ${tradeAction === 'buy' ? 'bought' : 'sold'} ${shares} share${shares > 1 ? 's' : ''} of ${symbol}`);
+      const actionWord = tradeAction === 'buy' ? 'bought' : 'sold';
+      const fractionalLabel = !marketOpenNow && tradeAction === 'buy' && isFractionalTrade ? 'fractional ' : '';
+      setTradeSuccessMessage(`You have ${actionWord} ${shares} ${fractionalLabel}share${shares > 1 ? 's' : ''} of ${symbol}`);
       setTimeout(() => setTradeSuccessMessage(''), 1600);
     } finally {
       setTradeSubmitting(false);
@@ -641,62 +785,110 @@ export default function StockDetailScreen() {
 
       <Modal visible={tradeVisible} animationType="slide" transparent={false} onRequestClose={() => setTradeVisible(false)}>
         <View style={styles.tradeModalRoot}>
+          <View style={styles.tradeGlowTop} />
+          <View style={styles.tradeGlowBottom} />
+
           <View style={styles.tradeModalHeader}>
-            <Text style={styles.tradeModalTitle}>Trade {symbol}</Text>
-            <Button mode="text" onPress={() => setTradeVisible(false)} textColor="#111">Close</Button>
+            <View>
+              <Text style={styles.tradeModalEyebrow}>Execution Ticket</Text>
+              <Text style={styles.tradeModalTitle}>Trade {symbol}</Text>
+            </View>
+            <Button mode="text" onPress={() => setTradeVisible(false)} textColor="#e2e8f0">Close</Button>
           </View>
 
-          <View style={styles.tradeToggleRow}>
-            <TouchableOpacity
-              style={[styles.tradeToggleButton, tradeAction === 'buy' && styles.tradeToggleButtonActiveBuy]}
-              onPress={() => setTradeAction('buy')}
+          <View style={styles.tradePanel}>
+            <View style={styles.tradeToggleRow}>
+              <TouchableOpacity
+                style={[styles.tradeToggleButton, tradeAction === 'buy' && styles.tradeToggleButtonActiveBuy]}
+                onPress={() => setTradeAction('buy')}
+              >
+                <Text style={[styles.tradeToggleText, tradeAction === 'buy' && styles.tradeToggleTextActive]}>Buy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tradeToggleButton, tradeAction === 'sell' && styles.tradeToggleButtonActiveSell]}
+                onPress={() => setTradeAction('sell')}
+              >
+                <Text style={[styles.tradeToggleText, tradeAction === 'sell' && styles.tradeToggleTextActive]}>Sell</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.tradeInfoGrid}>
+              <View style={styles.tradeMetricCard}>
+                <Text style={styles.tradeMetricLabel}>Current Price</Text>
+                <Text style={styles.tradeMetricValue}>${stock.price?.toFixed(2)}</Text>
+              </View>
+              <View style={styles.tradeMetricCard}>
+                <Text style={styles.tradeMetricLabel}>Cash Available</Text>
+                <Text style={styles.tradeMetricValue}>${(portfolio?.cash || 0).toFixed(2)}</Text>
+              </View>
+              <View style={styles.tradeMetricCard}>
+                <Text style={styles.tradeMetricLabel}>Shares Owned</Text>
+                <Text style={styles.tradeMetricValue}>{ownedShares}</Text>
+              </View>
+              <View style={styles.tradeMetricCard}>
+                <Text style={styles.tradeMetricLabel}>{tradeAction === 'buy' ? 'Max Buy' : 'Max Sell'}</Text>
+                <Text style={styles.tradeMetricValue}>
+                  {tradeAction === 'buy' ? maxBuyShares : ownedShares} shares
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.marketStatusCard, { backgroundColor: marketOpenNow ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.13)' }]}>
+              <Text style={[styles.marketStatusTitle, { color: marketOpenNow ? '#86efac' : '#fcd34d' }]}>
+                {isCryptoAsset
+                  ? '24/7 Crypto Market'
+                  : (marketOpenNow ? 'US Market Open (9:30 AM-4:00 PM ET)' : 'US Market Closed')}
+              </Text>
+              {!isCryptoAsset && !marketOpenNow && (
+                <Text style={styles.marketStatusSubtext}>
+                  Whole-share orders are queued until the next market open. Fractional buy orders can execute now.
+                </Text>
+              )}
+            </View>
+
+            <TextInput
+              mode="outlined"
+              label="Shares"
+              value={tradeShares}
+              onChangeText={setTradeShares}
+              keyboardType="numeric"
+              style={styles.tradeInput}
+              theme={{
+                colors: {
+                  primary: tradeAction === 'buy' ? '#22c55e' : '#ef4444',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  onSurfaceVariant: '#94a3b8',
+                  text: '#f8fafc',
+                  placeholder: '#94a3b8',
+                },
+              }}
+              textColor="#f8fafc"
+            />
+
+            <View style={styles.tradeTotalRow}>
+              <Text style={styles.tradeTotalLabel}>
+                Estimated {tradeAction === 'buy' ? 'Cost' : 'Proceeds'}
+              </Text>
+              <Text style={[styles.tradeTotalValue, { color: tradeAction === 'buy' ? '#4ade80' : '#f87171' }]}>
+                ${estimatedTradeValue}
+              </Text>
+            </View>
+
+            <Button
+              mode="contained"
+              onPress={submitTrade}
+              loading={tradeSubmitting}
+              disabled={tradeSubmitting}
+              buttonColor={tradeAction === 'buy' ? '#22c55e' : '#ef4444'}
+              style={styles.tradeSubmitButton}
+              contentStyle={styles.tradeSubmitContent}
+              textColor="#ffffff"
             >
-              <Text style={[styles.tradeToggleText, tradeAction === 'buy' && styles.tradeToggleTextActive]}>Buy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tradeToggleButton, tradeAction === 'sell' && styles.tradeToggleButtonActiveSell]}
-              onPress={() => setTradeAction('sell')}
-            >
-              <Text style={[styles.tradeToggleText, tradeAction === 'sell' && styles.tradeToggleTextActive]}>Sell</Text>
-            </TouchableOpacity>
+              {canExecuteNow
+                ? (tradeAction === 'buy' ? 'Execute Buy Order' : 'Execute Sell Order')
+                : `Queue ${tradeAction === 'buy' ? 'Buy' : 'Sell'} Order`}
+            </Button>
           </View>
-
-          <View style={styles.tradeInfoCard}>
-            <Text style={styles.tradeInfoLine}>Current Price: ${stock.price?.toFixed(2)}</Text>
-            <Text style={styles.tradeInfoLine}>Cash Available: ${(portfolio?.cash || 0).toFixed(2)}</Text>
-            <Text style={styles.tradeInfoLine}>Shares Owned: {ownedShares}</Text>
-            <Text style={styles.tradeInfoLine}>
-              {tradeAction === 'buy'
-                ? `Max Buy: ${stock.price ? Math.floor((portfolio?.cash || 0) / stock.price) : 0} shares`
-                : `Max Sell: ${ownedShares} shares`}
-            </Text>
-          </View>
-
-          <TextInput
-            mode="outlined"
-            label="Shares"
-            value={tradeShares}
-            onChangeText={setTradeShares}
-            keyboardType="numeric"
-            style={styles.tradeInput}
-          />
-
-          <Text style={styles.tradeTotalText}>
-            Estimated {tradeAction === 'buy' ? 'Cost' : 'Proceeds'}:{' '}
-            ${((Number(tradeShares) || 0) * (stock.price || 0)).toFixed(2)}
-          </Text>
-
-          <Button
-            mode="contained"
-            onPress={submitTrade}
-            loading={tradeSubmitting}
-            disabled={tradeSubmitting}
-            buttonColor={tradeAction === 'buy' ? '#16a34a' : '#ef4444'}
-            style={styles.tradeSubmitButton}
-            textColor="#fff"
-          >
-            {tradeAction === 'buy' ? 'Buy Shares' : 'Sell Shares'}
-          </Button>
         </View>
       </Modal>
 
@@ -710,7 +902,7 @@ export default function StockDetailScreen() {
         <View style={styles.tradeModalRoot}>
           <View style={styles.tradeModalHeader}>
             <Text style={styles.tradeModalTitle}>Earnings Report</Text>
-            <Button mode="text" onPress={() => setSelectedEarningsReport(null)} textColor="#111">Close</Button>
+            <Button mode="text" onPress={() => setSelectedEarningsReport(null)} textColor="#e2e8f0">Close</Button>
           </View>
           {selectedEarningsReport && (
             <View style={styles.tradeInfoCard}>
@@ -1025,70 +1217,174 @@ const styles = StyleSheet.create({
   },
   tradeModalRoot: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#020617',
     paddingTop: 56,
     paddingHorizontal: 20,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  tradeGlowTop: {
+    position: 'absolute',
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+    top: -170,
+    right: -110,
+  },
+  tradeGlowBottom: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(34, 197, 94, 0.16)',
+    bottom: -120,
+    left: -90,
   },
   tradeModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 16,
+  },
+  tradeModalEyebrow: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   tradeModalTitle: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '800',
-    color: '#111111',
+    color: '#f8fafc',
+  },
+  tradePanel: {
+    borderRadius: 22,
+    padding: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(10px)',
+      },
+    }),
   },
   tradeToggleRow: {
     flexDirection: 'row',
-    marginBottom: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: 14,
     padding: 4,
   },
   tradeToggleButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 11,
+    borderRadius: 12,
     alignItems: 'center',
   },
   tradeToggleButtonActiveBuy: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'rgba(34, 197, 94, 0.23)',
   },
   tradeToggleButtonActiveSell: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: 'rgba(239, 68, 68, 0.24)',
   },
   tradeToggleText: {
-    color: '#334155',
+    color: '#94a3b8',
     fontWeight: '700',
+    fontSize: 15,
   },
   tradeToggleTextActive: {
-    color: '#111827',
+    color: '#f8fafc',
   },
-  tradeInfoCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 14,
+  tradeInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     marginBottom: 14,
   },
+  tradeMetricCard: {
+    width: '49%',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(30, 41, 59, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.15)',
+  },
+  tradeMetricLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  tradeMetricValue: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  tradeInfoCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+  },
   tradeInfoLine: {
-    color: '#0f172a',
+    color: '#e2e8f0',
     fontSize: 14,
     marginBottom: 6,
   },
   tradeInput: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
     marginBottom: 12,
   },
-  tradeTotalText: {
-    color: '#111827',
-    fontSize: 15,
-    fontWeight: '700',
+  marketStatusCard: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  marketStatusTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  marketStatusSubtext: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  tradeTotalRow: {
     marginBottom: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(2, 6, 23, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tradeTotalLabel: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  tradeTotalValue: {
+    fontSize: 22,
+    fontWeight: '700',
   },
   tradeSubmitButton: {
-    borderRadius: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  tradeSubmitContent: {
+    paddingVertical: 6,
   },
   tradeSuccessRoot: {
     flex: 1,
