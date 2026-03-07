@@ -19,7 +19,14 @@ const DEFAULT_NEWS_IMAGES = [
   'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80',
 ];
+
+const hashString = (value = '') =>
+  String(value).split('').reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
 
 export default function NewsScreen() {
   const [news, setNews] = useState([]);
@@ -63,13 +70,19 @@ export default function NewsScreen() {
     fetchNews();
   };
 
-  const resolveImageForIndex = (article, index) => {
+  const resolveImageForIndex = (article, index, usedUriCount) => {
     const key = `${article.url || article.title || index}_${index}`;
     const fallbackIndexOffset = imageErrorMap[key] || 0;
-    const fallbackImage = DEFAULT_NEWS_IMAGES[(index + fallbackIndexOffset) % DEFAULT_NEWS_IMAGES.length];
-    const primaryImage = fallbackIndexOffset > 0
+    const hashSeed = hashString(`${article.source || ''}-${article.title || ''}`);
+    const fallbackImage = DEFAULT_NEWS_IMAGES[(hashSeed + fallbackIndexOffset) % DEFAULT_NEWS_IMAGES.length];
+    let primaryImage = fallbackIndexOffset > 0
       ? fallbackImage
       : (article.imageUrl || fallbackImage);
+    const duplicateCount = usedUriCount.get(primaryImage) || 0;
+    if (duplicateCount > 0) {
+      primaryImage = DEFAULT_NEWS_IMAGES[(hashSeed + duplicateCount + fallbackIndexOffset + index) % DEFAULT_NEWS_IMAGES.length];
+    }
+    usedUriCount.set(primaryImage, (usedUriCount.get(primaryImage) || 0) + 1);
     return { imageUri: primaryImage, imageKey: key };
   };
 
@@ -114,9 +127,11 @@ export default function NewsScreen() {
       </View>
 
       <View style={styles.newsGrid}>
-        {news.map((article, index) => (
+        {(() => {
+          const usedUriCount = new Map();
+          return news.map((article, index) => (
           (() => {
-            const { imageUri, imageKey } = resolveImageForIndex(article, index);
+            const { imageUri, imageKey } = resolveImageForIndex(article, index, usedUriCount);
             return (
           <TouchableOpacity
             key={article.url || article.title || String(index)}
@@ -162,7 +177,8 @@ export default function NewsScreen() {
           </TouchableOpacity>
             );
           })()
-        ))}
+          ));
+        })()}
       </View>
 
       {news.length === 0 && (
