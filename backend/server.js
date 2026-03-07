@@ -261,15 +261,32 @@ const getMarketMoversSnapshot = async () => {
     );
 
     const validStocks = stocks.filter(Boolean);
+    const gainers = validStocks
+      .filter((stock) => stock.changePercent > 0)
+      .sort((a, b) => b.changePercent - a.changePercent)
+      .slice(0, 20);
+    const losers = validStocks
+      .filter((stock) => stock.changePercent < 0)
+      .sort((a, b) => a.changePercent - b.changePercent)
+      .slice(0, 20);
+
+    const demoMovers = getDemoMovers();
+    const mergedGainers = [...gainers];
+    demoMovers.gainers.forEach((demoStock) => {
+      if (!mergedGainers.some((item) => item.symbol === demoStock.symbol)) {
+        mergedGainers.push(demoStock);
+      }
+    });
+    const mergedLosers = [...losers];
+    demoMovers.losers.forEach((demoStock) => {
+      if (!mergedLosers.some((item) => item.symbol === demoStock.symbol)) {
+        mergedLosers.push(demoStock);
+      }
+    });
+
     const snapshot = {
-      gainers: validStocks
-        .filter((stock) => stock.changePercent > 0)
-        .sort((a, b) => b.changePercent - a.changePercent)
-        .slice(0, 20),
-      losers: validStocks
-        .filter((stock) => stock.changePercent < 0)
-        .sort((a, b) => a.changePercent - b.changePercent)
-        .slice(0, 20),
+      gainers: mergedGainers.slice(0, 20),
+      losers: mergedLosers.slice(0, 20),
     };
 
     setCachedData(cacheKey, snapshot);
