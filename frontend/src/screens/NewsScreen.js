@@ -9,9 +9,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { newsAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
+import { subscribeNewsRefresh } from '../utils/newsRefresh';
 
 const screenWidth = Dimensions.get('window').width;
 const DEFAULT_NEWS_IMAGES = [
@@ -27,19 +28,19 @@ export default function NewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [imageErrorMap, setImageErrorMap] = useState({});
   const navigation = useNavigation();
-  const route = useRoute();
   const theme = useTheme();
-  const refreshAt = route.params?.forceRefreshAt;
 
   useEffect(() => {
     fetchNews();
   }, []);
 
   useEffect(() => {
-    if (!refreshAt) return;
-    setRefreshing(true);
-    fetchNews();
-  }, [refreshAt]);
+    const unsubscribe = subscribeNewsRefresh(() => {
+      setRefreshing(true);
+      fetchNews();
+    });
+    return unsubscribe;
+  }, []);
 
   const fetchNews = async () => {
     try {
@@ -89,12 +90,25 @@ export default function NewsScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          Business News
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
-          Latest financial headlines
-        </Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+              Business News
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.colors.placeholder }]}>
+              Latest financial headlines
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={onRefresh}
+            style={[styles.refreshButton, { backgroundColor: theme.colors.surface }]}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.refreshButtonText, { color: theme.colors.primary }]}>
+              Refresh
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.newsGrid}>
@@ -180,6 +194,11 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
   headerTitle: {
     fontSize: 36,
     fontWeight: '700',
@@ -187,6 +206,16 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 16,
+  },
+  refreshButton: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  refreshButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   newsGrid: {
     flexDirection: 'row',

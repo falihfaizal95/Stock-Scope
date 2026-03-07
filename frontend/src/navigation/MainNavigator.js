@@ -14,6 +14,7 @@ import StockDetailScreen from '../screens/StockDetailScreen';
 import NewsDetailScreen from '../screens/NewsDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { useAuth } from '../context/AuthContext';
+import { publishNewsRefresh } from '../utils/newsRefresh';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -131,7 +132,8 @@ function HomeTabs() {
             triggerTabHaptic();
             const now = Date.now();
             if (now - lastNewsTabPressAt < 420) {
-              navigation.navigate('News', { forceRefreshAt: now });
+              navigation.navigate('News');
+              publishNewsRefresh();
             }
             lastNewsTabPressAt = now;
           },
