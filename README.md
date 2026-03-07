@@ -1,235 +1,158 @@
-# StockScope 📈
-------------------
-A modern, cross-platform stock analyzer and researcher app built with React Native and Node.js. Encourages Trading Various U.S. Stocks through Paper Trading
+# StockScope
 
-## 🚀 Features
+Cross-platform stock research and paper-trading app (Web, iOS, Android) built with Expo React Native + Express.
 
-- **Real-Time Stock Data**: Get live prices, charts, and market data
-- **Smart Search**: Search stocks by ticker symbol or company name
-- **Personal Watchlist**: Track your favorite stocks
-- **Market Overview**: View top gainers, losers, and market indices
-- **News Feed**: Stay updated with the latest financial news
-- **Authentication**: Secure login with Firebase Auth
-- **Cross-Platform**: iOS, Android, and Web support via Expo
+Repository: [https://github.com/falihfaizal95/Stock-Scope](https://github.com/falihfaizal95/Stock-Scope)
 
-## 📱 Tech Stack Used
-------------------------
-### Frontend
-- React Native + Expo
-- React Navigation (Bottom Tabs + Stack)
-- React Native Paper (UI Components)
-- Firebase (Authentication + Firestore)
-- Axios (API Calls)
+## What It Does
 
-### Backend
+- Market dashboard with portfolio equity graph and buying power
+- Top gainers/losers and crypto movers
+- Stock search with detail pages
+- Interactive stock chart (hover/crosshair on web)
+- Watchlist tracking (added date, entry price, live gain/loss)
+- Paper trading from stock detail (buy/sell, holdings updates)
+- Trading-hours logic
+  - US stocks/ETFs: 9:30 AM-4:00 PM ET, weekdays, major US market holidays excluded
+  - Off-hours stock orders are queued
+  - Crypto trades 24/7
+- News feed + article detail
+  - Back-to-news action
+  - Refresh behavior (pull-to-refresh + repeat-tap refresh)
+  - Image fallbacks and duplicate-image prevention
+- Profile/settings with theme mode toggle
+
+## Stack
+
+### Frontend (`/frontend`)
+- Expo React Native
+- React Navigation (Bottom Tabs + Native Stack)
+- React Native Paper
+- Firebase Auth + Firestore
+- Axios
+- react-native-chart-kit
+
+### Backend (`/backend`)
 - Node.js + Express
-- Finnhub API (Stock Data)
-- NewsAPI (Financial News)
-- Node-Cache (Caching)
+- Finnhub (quotes, profile, market, candles, earnings, peers)
+- NewsAPI (headlines)
+- NodeCache (5-minute in-memory cache)
 
-## 📦 Installation
----------------------------
+## Architecture
+
+- Mobile/web client calls backend under `/api/*`
+- Backend normalizes provider payloads and returns consistent response shape
+- Fallback data is used when provider auth/rate limits fail to avoid blank screens
+- Portfolio/watchlist state persisted in Firestore, with local fallback in web error cases
+
+## Key API Endpoints
+
+- `GET /api/health`
+- `GET /api/market/overview`
+- `GET /api/market/gainers`
+- `GET /api/market/losers`
+- `GET /api/crypto`
+- `GET /api/stock/search?q=AAPL`
+- `GET /api/stock/:symbol`
+- `GET /api/stock/:symbol/candles`
+- `GET /api/stock/:symbol/related`
+- `GET /api/stock/:symbol/earnings`
+- `GET /api/news`
+- `GET /api/news/wsj`
+- `GET /api/news/:symbol`
+
+## Local Development
+
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- iOS Simulator (Mac only) or Android Emulator
+- Node.js 18+ recommended
+- npm
 
-### Backend Setup
+### 1) Backend
 
-1. Navigate to the backend directory:
 ```bash
 cd backend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Create a `.env` file:
-```bash
 cp .env.example .env
 ```
 
-4. Get API keys:
-   - **Finnhub**: Sign up at [https://finnhub.io/register](https://finnhub.io/register) (Free tier available)
-   - **NewsAPI**: Sign up at [https://newsapi.org/register](https://newsapi.org/register) (Free tier available)
+Set `backend/.env`:
 
-5. Update `.env` with your API keys:
 ```env
-FINNHUB_API_KEY=your_finnhub_api_key_here
-NEWS_API_KEY=your_newsapi_key_here
+FINNHUB_API_KEY=your_finnhub_key
+NEWS_API_KEY=your_newsapi_key
 PORT=3000
 ```
 
-6. Start the backend server:
+Run backend:
+
 ```bash
 npm run dev
 ```
 
-The server will run on `http://localhost:3000`
+Backend health:
 
-### Frontend Setup
+```bash
+curl -s http://localhost:3000/health
+```
 
-1. Navigate to the frontend directory:
+### 2) Frontend
+
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
+npm start -- --web --port 8081
 ```
 
-3. Configure Firebase:
-   - Create a Firebase project at [https://console.firebase.google.com](https://console.firebase.google.com)
-   - Enable Authentication (Email/Password)
-   - Enable Firestore Database
-   - Copy your Firebase config
-   - Update `src/utils/firebase.js` with your config
+Open:
+- `http://localhost:8081`
 
-4. Update API base URL (if different):
-   - Edit `src/utils/api.js` and change `API_BASE_URL` if needed
+## Firebase Setup
 
-5. Start the Expo development server:
-```bash
-npm start
-```
+Update `frontend/src/utils/firebase.js` with your project config.
 
-6. Run on your preferred platform:
-   - Press `i` for iOS Simulator
-   - Press `a` for Android Emulator
-   - Press `w` for Web
-   - Scan QR code with Expo Go app on your phone
----------
-## 🏗️ Project Structure
+Minimum required:
+- Authentication: Email/Password enabled
+- Firestore enabled
 
-```
-StockScope/
-├── frontend/                 # React Native app
-│   ├── src/
-│   │   ├── screens/         # App screens
-│   │   ├── navigation/      # Navigation setup
-│   │   ├── context/         # React Context (Auth, Watchlist)
-│   │   └── utils/           # Utilities (API, theme, firebase)
-│   ├── App.js
-│   └── package.json
-├── backend/                  # Node.js API server
-│   ├── server.js            # Main server file
-│   ├── package.json
-│   └── .env.example
-└── README.md
-```
+## Deployment (Vercel)
 
-## 📱 Screens
+This repo is configured for Vercel.
 
-1. **Login Screen**: Email/password authentication
-2. **Home Screen**: Market overview, top gainers/losers, watchlist summary
-3. **Search Screen**: Search stocks with live results
-4. **Stock Detail Screen**: Detailed stock information with news
-5. **News Screen**: Latest financial news
-6. **Profile Screen**: User information and settings
+Required project environment variables:
+- `FINNHUB_API_KEY`
+- `NEWS_API_KEY`
 
-## 🔧 Configuration
+Also ensure deployment protection/auth gates are disabled if you want public access.
 
-### Firebase Setup
+## Important Files
 
-1. Create a new Firebase project
-2. Enable Authentication → Email/Password
-3. Enable Firestore Database
-4. Add Firestore security rules:
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /watchlists/{watchlistId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-  }
-}
-```
+- `frontend/src/screens/HomeScreen.js`
+- `frontend/src/screens/SearchScreen.js`
+- `frontend/src/screens/StockDetailScreen.js`
+- `frontend/src/screens/NewsScreen.js`
+- `frontend/src/screens/NewsDetailScreen.js`
+- `frontend/src/screens/WatchlistScreen.js`
+- `frontend/src/screens/ProfileScreen.js`
+- `frontend/src/navigation/MainNavigator.js`
+- `frontend/src/context/PortfolioContext.js`
+- `frontend/src/context/WatchlistContext.js`
+- `backend/server.js`
+- `CHANGELOG.md`
+- `PROJECT_OVERVIEW.txt`
 
-5. Copy your Firebase config to `frontend/src/utils/firebase.js`
+## Troubleshooting
 
-### API Configuration
+- Blank market/news/search data:
+  - Verify Vercel env vars are set and redeploy
+  - Check backend logs for provider 401/403/429
+- Web not updating:
+  - Hard refresh (`Cmd+Shift+R`)
+- Missing images:
+  - Provider image URLs are filtered/fallbacked; refresh feed to rotate fallback
+- Trading behavior:
+  - Outside US market hours, stock/ETF orders queue by design
+  - Crypto should execute immediately
 
-The app uses two external APIs:
+## Recent Work Log
 
-1. **Finnhub API** (Stock Data)
-   - Free tier: 60 calls/minute
-   - Used for: Stock quotes, company profiles, news
-
-2. **NewsAPI** (Financial News)
-   - Free tier: 100 requests/day
-   - Used for: General market news
-
-## 🚀 Deployment
-
-### Backend Deployment
-
-Deploy to platforms like:
-- Heroku
-- Railway
-- Render
-- AWS EC2
-
-Update the `API_BASE_URL` in `frontend/src/utils/api.js` to point to your deployed backend.
-
-### Frontend Deployment
-
-Build for production:
-
-```bash
-# iOS
-expo build:ios
-
-# Android
-expo build:android
-
-# Web
-expo build:web
-```
-
-## 🐛 Troubleshooting
-
-### Backend Issues
-- Ensure API keys are correctly set in `.env`
-- Check if the server is running on port 3000
-- Verify API rate limits haven't been exceeded
-
-### Frontend Issues
-- Clear Expo cache: `expo start -c`
-- Reinstall dependencies: `rm -rf node_modules && npm install`
-- Check Firebase configuration
-- Ensure backend is running and accessible
-
-## 📝 API Endpoints
-
-### Stock Endpoints
-- `GET /api/stock/search?q={query}` - Search stocks
-- `GET /api/stock/:symbol` - Get stock details
-- `GET /api/market/overview` - Market overview
-- `GET /api/market/gainers` - Top gainers
-- `GET /api/market/losers` - Top losers
-
-### News Endpoints
-- `GET /api/news` - General news
-- `GET /api/news/:symbol` - Stock-specific news
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-
-
-## 🙏 Acknowledgments
-
-- [Finnhub](https://finnhub.io) for stock data API
-- [NewsAPI](https://newsapi.org) for news API
-- [Expo](https://expo.dev) for cross-platform development
-- [React Native Paper](https://callstack.github.io/react-native-paper/) for UI components
--------------
-
-
-
+See `CHANGELOG.md` for commit-level updates and feature/fix history.
