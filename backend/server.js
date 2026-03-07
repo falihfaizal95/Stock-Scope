@@ -170,6 +170,52 @@ const normalizeNewsArticle = (article, index) => {
     author: article.author || null,
   };
 };
+const normalizeImageKey = (uri) => {
+  if (!uri || typeof uri !== 'string') return '';
+  try {
+    const parsed = new URL(uri);
+    return `${parsed.hostname.replace(/^www\./, '')}${parsed.pathname}`;
+  } catch (error) {
+    return uri;
+  }
+};
+
+const ensureDiverseNewsImages = (articles = []) => {
+  const usedImageKeys = new Set();
+  let fallbackCursor = 0;
+
+  return articles.map((article, index) => {
+    const currentImage = article?.imageUrl || '';
+    const currentKey = normalizeImageKey(currentImage);
+    let nextImage = currentImage;
+
+    if (!currentImage || usedImageKeys.has(currentKey)) {
+      let chosen = null;
+      for (let attempt = 0; attempt < DEFAULT_NEWS_IMAGES.length; attempt += 1) {
+        const candidate = DEFAULT_NEWS_IMAGES[(fallbackCursor + index + attempt) % DEFAULT_NEWS_IMAGES.length];
+        const candidateKey = normalizeImageKey(candidate);
+        if (!usedImageKeys.has(candidateKey)) {
+          chosen = candidate;
+          fallbackCursor = (fallbackCursor + attempt + 1) % DEFAULT_NEWS_IMAGES.length;
+          break;
+        }
+      }
+
+      if (!chosen) {
+        chosen = DEFAULT_NEWS_IMAGES[(fallbackCursor + index) % DEFAULT_NEWS_IMAGES.length];
+        fallbackCursor = (fallbackCursor + 1) % DEFAULT_NEWS_IMAGES.length;
+      }
+      nextImage = chosen;
+    }
+
+    usedImageKeys.add(normalizeImageKey(nextImage));
+    return {
+      ...article,
+      imageUrl: nextImage,
+    };
+  });
+};
+
 const buildExtendedDemoNews = (targetCount = 24) => {
   const extended = [];
   for (let i = 0; i < targetCount; i += 1) {
@@ -178,6 +224,7 @@ const buildExtendedDemoNews = (targetCount = 24) => {
       ...seed,
       url: `${seed.url}${seed.url.includes('?') ? '&' : '?'}demo=${i + 1}`,
       publishedAt: new Date(Date.now() - i * 45 * 60 * 1000).toISOString(),
+      imageUrl: DEFAULT_NEWS_IMAGES[i % DEFAULT_NEWS_IMAGES.length],
     });
   }
   return extended;
@@ -894,12 +941,16 @@ app.get('/api/news', async (req, res) => {
       }
     });
 
-    setCachedData(cacheKey, news);
-    res.json(news);
+    const diversifiedNews = ensureDiverseNewsImages(news);
+    setCachedData(cacheKey, diversifiedNews);
+    res.json(diversifiedNews);
   } catch (error) {
     console.error('News error:', error.message);
     if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
-      return res.json(buildExtendedDemoNews(24).map((article, index) => normalizeNewsArticle(article, index)));
+      const fallbackNews = buildExtendedDemoNews(24)
+        .map((article, index) => normalizeNewsArticle(article, index))
+        .filter(Boolean);
+      return res.json(ensureDiverseNewsImages(fallbackNews));
     }
     res.status(500).json({ error: 'Failed to fetch news' });
   }
@@ -976,12 +1027,16 @@ app.get('/api/news/wsj', async (req, res) => {
       }
     });
 
-    setCachedData(cacheKey, news);
-    res.json(news);
+    const diversifiedNews = ensureDiverseNewsImages(news);
+    setCachedData(cacheKey, diversifiedNews);
+    res.json(diversifiedNews);
   } catch (error) {
     console.error('WSJ news error:', error.message);
     if (isProviderAuthError(error) || getAxiosStatus(error) === 429) {
-      return res.json(DEMO_NEWS);
+      const fallbackNews = buildExtendedDemoNews(12)
+        .map((article, index) => normalizeNewsArticle(article, index))
+        .filter(Boolean);
+      return res.json(ensureDiverseNewsImages(fallbackNews));
     }
     res.status(500).json({ error: 'Failed to fetch WSJ news' });
   }
@@ -1014,8 +1069,9 @@ app.get('/api/news/:symbol', async (req, res) => {
       author: null,
     }, index)).filter(Boolean);
 
-    setCachedData(cacheKey, news);
-    res.json(news);
+    const diversifiedNews = ensureDiverseNewsImages(news);
+    setCachedData(cacheKey, diversifiedNews);
+    res.json(diversifiedNews);
   } catch (error) {
     console.error('Stock news error:', error.message);
     res.status(500).json({ error: 'Failed to fetch stock news' });
