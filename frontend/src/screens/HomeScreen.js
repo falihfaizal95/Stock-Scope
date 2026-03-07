@@ -84,6 +84,7 @@ export default function HomeScreen() {
   const portfolioTotal = portfolio?.totalValue ?? portfolio?.cash ?? 0;
   const buyingPower = portfolio?.cash ?? 0;
   const positionCount = portfolio?.holdings?.length ?? 0;
+  const holdings = Array.isArray(portfolio?.holdings) ? portfolio.holdings : [];
   const portfolioRanges = ['LIVE', '1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'];
   const gridGap = 12;
   const gridColumns = windowWidth >= 1700 ? 4 : windowWidth >= 1200 ? 3 : windowWidth >= 760 ? 2 : 1;
@@ -465,6 +466,11 @@ export default function HomeScreen() {
     setHoveredPortfolioIndex(Math.max(0, Math.min(chartPointCount - 1, index)));
   };
 
+  const formatMoney = (value) => {
+    const numeric = Number(value || 0);
+    return `$${numeric.toFixed(2)}`;
+  };
+
   if (loading) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
@@ -600,6 +606,60 @@ export default function HomeScreen() {
                 </>
               )}
             </View>
+          </View>
+
+          <View style={[styles.holdingsSection, { borderTopColor: theme.colors.border, borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.holdingsTitle, { color: theme.colors.text }]}>
+              Current Holdings
+            </Text>
+            {holdings.length === 0 ? (
+              <Text style={[styles.holdingsEmptyText, { color: theme.colors.placeholder }]}>
+                You do not hold any positions yet.
+              </Text>
+            ) : (
+              holdings.map((holding) => {
+                const currentPrice = Number(holding.currentPrice ?? holding.avgPrice ?? 0);
+                const avgPrice = Number(holding.avgPrice ?? 0);
+                const shares = Number(holding.shares ?? 0);
+                const marketValue = Number(holding.marketValue ?? shares * currentPrice);
+                const gainLossDollar = Number(holding.gainLossDollar ?? (currentPrice - avgPrice) * shares);
+                const gainLossPercent = Number(
+                  holding.gainLossPercent ??
+                    (avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0)
+                );
+                const positive = gainLossDollar >= 0;
+
+                return (
+                  <TouchableOpacity
+                    key={holding.symbol}
+                    onPress={() => navigation.navigate('StockDetail', { symbol: holding.symbol })}
+                    style={[styles.holdingRow, { borderTopColor: theme.colors.border }]}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.holdingLeft}>
+                      <Text style={[styles.holdingSymbol, { color: theme.colors.text }]}>{holding.symbol}</Text>
+                      <Text style={[styles.holdingMeta, { color: theme.colors.placeholder }]}>
+                        {shares.toFixed(4).replace(/\.?0+$/, '')} shares
+                      </Text>
+                    </View>
+                    <View style={styles.holdingRight}>
+                      <Text style={[styles.holdingValue, { color: theme.colors.text }]}>
+                        {formatMoney(marketValue)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.holdingPnL,
+                          { color: positive ? theme.colors.positive : theme.colors.negative },
+                        ]}
+                      >
+                        {positive ? '+' : '-'}{formatMoney(Math.abs(gainLossDollar))} ({positive ? '+' : ''}
+                        {gainLossPercent.toFixed(2)}%)
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
 
           <View style={[styles.portfolioTimeframeRow, { borderTopColor: theme.colors.border }]}>
@@ -1114,6 +1174,55 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 10,
     borderTopWidth: 1,
+  },
+  holdingsSection: {
+    marginTop: 6,
+    marginBottom: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingVertical: 10,
+  },
+  holdingsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  holdingsEmptyText: {
+    fontSize: 13,
+    lineHeight: 18,
+    paddingVertical: 2,
+  },
+  holdingRow: {
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+  },
+  holdingLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  holdingRight: {
+    alignItems: 'flex-end',
+  },
+  holdingSymbol: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  holdingMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  holdingValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  holdingPnL: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   portfolioTimeframePill: {
     paddingHorizontal: 8,
