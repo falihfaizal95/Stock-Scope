@@ -148,12 +148,12 @@ export default function HomeScreen() {
       
       // Add top gainers (filter out invalid entries)
       if (Array.isArray(gainers)) {
-        allStocks.push(...gainers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 10));
+        allStocks.push(...gainers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 24));
       }
       
       // Add top losers (filter out invalid entries)
       if (Array.isArray(losers)) {
-        allStocks.push(...losers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 10));
+        allStocks.push(...losers.filter(s => s && s.symbol && s.price !== undefined).slice(0, 16));
       }
       
       // Sort all stocks by change percentage (gainers first)
