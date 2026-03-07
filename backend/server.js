@@ -33,6 +33,8 @@ const MARKET_MOVER_SYMBOLS = [
 
 const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'ADA', 'XRP', 'DOGE', 'DOT']);
 const DEMO_STOCKS = [
+  { symbol: 'QQQ', name: 'Invesco QQQ Trust', price: 489.12, changePercent: 0.57, logo: null },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', price: 532.46, changePercent: 0.41, logo: null },
   { symbol: 'AAPL', name: 'Apple Inc', price: 189.42, changePercent: 1.22, logo: null },
   { symbol: 'MSFT', name: 'Microsoft Corp', price: 421.17, changePercent: 0.94, logo: null },
   { symbol: 'NVDA', name: 'NVIDIA Corp', price: 903.11, changePercent: 2.11, logo: null },
@@ -97,9 +99,11 @@ const getDemoMovers = () => {
 };
 const getDemoSearchResults = (query) => {
   const normalized = String(query || '').trim().toUpperCase();
-  return DEMO_STOCKS.filter((stock) =>
+  const filtered = DEMO_STOCKS.filter((stock) =>
     stock.symbol.includes(normalized) || stock.name.toUpperCase().includes(normalized)
-  ).map((stock) => ({
+  );
+  const candidates = filtered.length > 0 ? filtered : DEMO_STOCKS.slice(0, 8);
+  return candidates.map((stock) => ({
     symbol: stock.symbol,
     name: stock.name,
     type: 'Common Stock',
