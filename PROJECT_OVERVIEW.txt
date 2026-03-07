@@ -209,6 +209,22 @@ RECENTLY ADDED / UPDATED FEATURES (LATEST PASS)
 - Profile fixes (holdings ≠ watchlist) + theme toggle settings
 - Expanded chart stats panel with much richer metrics
 
+CHANGE DOCUMENTATION (MARCH 2026)
+- All feature and bug-fix changes are now documented in:
+  - Git commit history on `main`
+  - `CHANGELOG.md` in the repository root
+- Most recent implementation records include:
+  - `aad76f2` Vercel deployment config + web API base URL
+  - `5ffcc82` Search redesign + card imagery updates
+  - `6c4c8e9` More top gainers on home
+  - `51e186d` Guaranteed market-movers fallback (never empty)
+  - `347ce50` News UX improvements (detail/back/readability/fallbacks)
+  - `0ac4e6e` Reliable news tab repeat-tap refresh behavior
+  - `33e19b6` News image hardening + expanded news volume
+  - `6dd3577` US market-hours trade gating + queued orders + crypto 24/7
+  - `ccbb964` Current holdings section under portfolio graph
+  - `b96700d` Duplicate news-card image avoidance
+
 ═══════════════════════════════════════════════════════════════════
 
 NEXT RECOMMENDED IMPROVEMENTS
@@ -222,5 +238,5 @@ NEXT RECOMMENDED IMPROVEMENTS
 
 ═══════════════════════════════════════════════════════════════════
 
-Last Updated: February 24, 2026
+Last Updated: March 7, 2026
 Maintainer snapshot generated from current codebase state.
