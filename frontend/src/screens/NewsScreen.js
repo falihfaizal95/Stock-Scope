@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { newsAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
@@ -25,17 +25,27 @@ export default function NewsScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [imageErrorMap, setImageErrorMap] = useState({});
   const navigation = useNavigation();
+  const route = useRoute();
   const theme = useTheme();
+  const refreshAt = route.params?.forceRefreshAt;
 
   useEffect(() => {
     fetchNews();
   }, []);
 
+  useEffect(() => {
+    if (!refreshAt) return;
+    setRefreshing(true);
+    fetchNews();
+  }, [refreshAt]);
+
   const fetchNews = async () => {
     try {
       const data = await newsAPI.getNewsFeed();
       setNews(Array.isArray(data) ? data : []);
+      setImageErrorMap({});
       setErrorMessage('');
     } catch (error) {
       console.error('Error fetching news:', error);
@@ -50,6 +60,14 @@ export default function NewsScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchNews();
+  };
+
+  const resolveImageForIndex = (article, index) => {
+    const key = `${article.url || article.title || index}_${index}`;
+    const fallbackIndexOffset = imageErrorMap[key] || 0;
+    const fallbackImage = DEFAULT_NEWS_IMAGES[(index + fallbackIndexOffset) % DEFAULT_NEWS_IMAGES.length];
+    const primaryImage = article.imageUrl || fallbackImage;
+    return { imageUri: primaryImage, imageKey: key };
   };
 
   if (loading) {
@@ -82,10 +100,10 @@ export default function NewsScreen() {
       <View style={styles.newsGrid}>
         {news.map((article, index) => (
           (() => {
-            const imageUri = article.imageUrl || DEFAULT_NEWS_IMAGES[index % DEFAULT_NEWS_IMAGES.length];
+            const { imageUri, imageKey } = resolveImageForIndex(article, index);
             return (
           <TouchableOpacity
-            key={index}
+            key={article.url || article.title || String(index)}
             style={[styles.newsCard, { backgroundColor: theme.colors.surface }]}
             activeOpacity={0.8}
             onPress={() => navigation.navigate('NewsDetail', { article })}
@@ -95,7 +113,12 @@ export default function NewsScreen() {
                 source={{ uri: imageUri }}
                 style={styles.newsImage}
                 resizeMode="cover"
-                onError={() => {}}
+                onError={() => {
+                  setImageErrorMap((prev) => ({
+                    ...prev,
+                    [imageKey]: (prev[imageKey] || 0) + 1,
+                  }));
+                }}
               />
             ) : (
               <View style={[styles.newsImagePlaceholder, { backgroundColor: theme.colors.border }]}>

@@ -6,7 +6,7 @@ import {
   Image,
   Dimensions,
   Linking,
-  TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -26,11 +26,69 @@ export default function NewsDetailScreen() {
     }
   };
 
+  const handleBackToNews = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', { screen: 'News' });
+  };
+
+  const buildSummaryParagraphs = () => {
+    const text = `${article.description || ''} ${article.content || ''}`
+      .replace(/\[\+[0-9]+ chars\]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) return [];
+
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 3) {
+      const words = text.split(' ').filter(Boolean);
+      if (words.length < 40) return [text];
+      const midpoint = Math.ceil(words.length / 2);
+      return [
+        words.slice(0, midpoint).join(' '),
+        words.slice(midpoint).join(' '),
+      ].filter(Boolean);
+    }
+
+    const chunkSize = Math.ceil(sentences.length / 3);
+    const paragraphs = [];
+    for (let i = 0; i < sentences.length; i += chunkSize) {
+      const paragraph = sentences.slice(i, i + chunkSize).join(' ');
+      if (paragraph) paragraphs.push(paragraph);
+      if (paragraphs.length === 3) break;
+    }
+    return paragraphs.length >= 2 ? paragraphs : [text];
+  };
+
+  const summaryParagraphs = buildSummaryParagraphs();
+  const shouldShowAuthor = Boolean(
+    article.author &&
+    String(article.author).trim() &&
+    !/stockscope/i.test(String(article.author))
+  );
+
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.topBar}>
+        <Button
+          mode="text"
+          onPress={handleBackToNews}
+          textColor={theme.colors.primary}
+          labelStyle={styles.backButtonLabel}
+        >
+          ← Back to News
+        </Button>
+      </View>
+
       {article.imageUrl && (
         <Image
           source={{ uri: article.imageUrl }}
@@ -53,7 +111,7 @@ export default function NewsDetailScreen() {
               minute: '2-digit',
             })}
           </Text>
-          {article.author && (
+          {shouldShowAuthor && (
             <Text style={[styles.author, { color: theme.colors.placeholder }]}>
               By {article.author}
             </Text>
@@ -70,11 +128,16 @@ export default function NewsDetailScreen() {
           </Text>
         )}
 
-        {article.content && (
+        {summaryParagraphs.length > 0 && (
           <View style={[styles.contentCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.contentText, { color: theme.colors.text }]}>
-              {article.content.replace(/\[\+[0-9]+ chars\]/g, '')}
-            </Text>
+            {summaryParagraphs.map((paragraph, index) => (
+              <Text
+                key={`summary-${index}`}
+                style={[styles.contentText, { color: theme.colors.text }]}
+              >
+                {paragraph}
+              </Text>
+            ))}
           </View>
         )}
 
@@ -97,6 +160,15 @@ export default function NewsDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  topBar: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backButtonLabel: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   headerImage: {
     width: screenWidth,
@@ -142,6 +214,8 @@ const styles = StyleSheet.create({
   contentText: {
     fontSize: 16,
     lineHeight: 26,
+    marginBottom: 14,
+    fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia',
   },
   readMoreButton: {
     marginTop: 8,

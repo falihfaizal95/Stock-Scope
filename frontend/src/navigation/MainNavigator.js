@@ -2,6 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -15,6 +17,13 @@ import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+let lastNewsTabPressAt = 0;
+
+const triggerTabHaptic = () => {
+  if (Platform.OS === 'ios') {
+    Haptics.selectionAsync().catch(() => {});
+  }
+};
 
 function HomeTabs() {
   return (
@@ -41,7 +50,7 @@ function HomeTabs() {
               size={focused ? 24 : 22} 
               color={color}
               style={{
-                transition: 'all 0.2s ease-in-out',
+                ...(Platform.OS === 'web' ? { transition: 'all 0.2s ease-in-out' } : {}),
                 transform: focused ? [{ scale: 1.1 }] : [{ scale: 1 }],
               }}
             />
@@ -53,9 +62,9 @@ function HomeTabs() {
           backgroundColor: '#1c1c1e',
           borderTopWidth: 0,
           borderTopColor: 'transparent',
-          paddingBottom: 12,
-          paddingTop: 8,
-          height: 70,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+          paddingTop: Platform.OS === 'ios' ? 10 : 8,
+          height: Platform.OS === 'ios' ? 84 : 70,
           elevation: 0,
           shadowOpacity: 0,
           borderTopLeftRadius: 20,
@@ -76,6 +85,7 @@ function HomeTabs() {
         tabBarIconStyle: {
           marginBottom: 2,
         },
+        tabBarHideOnKeyboard: true,
         animationEnabled: true,
         headerShown: false,
       })}
@@ -86,12 +96,18 @@ function HomeTabs() {
         options={{
           tabBarLabel: 'Home',
         }}
+        listeners={{
+          tabPress: triggerTabHaptic,
+        }}
       />
       <Tab.Screen 
         name="Search" 
         component={SearchScreen}
         options={{
           tabBarLabel: 'Search',
+        }}
+        listeners={{
+          tabPress: triggerTabHaptic,
         }}
       />
       <Tab.Screen 
@@ -100,6 +116,9 @@ function HomeTabs() {
         options={{
           tabBarLabel: 'Watchlist',
         }}
+        listeners={{
+          tabPress: triggerTabHaptic,
+        }}
       />
       <Tab.Screen 
         name="News" 
@@ -107,12 +126,25 @@ function HomeTabs() {
         options={{
           tabBarLabel: 'News',
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            triggerTabHaptic();
+            const now = Date.now();
+            if (now - lastNewsTabPressAt < 420) {
+              navigation.navigate('News', { forceRefreshAt: now });
+            }
+            lastNewsTabPressAt = now;
+          },
+        })}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
+        }}
+        listeners={{
+          tabPress: triggerTabHaptic,
         }}
       />
     </Tab.Navigator>

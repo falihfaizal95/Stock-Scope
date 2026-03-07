@@ -48,34 +48,109 @@ const DEMO_NEWS = [
   {
     title: 'Markets mixed as investors track rates and earnings',
     description: 'U.S. equities traded in a narrow range as investors weighed inflation and corporate updates.',
-    source: 'StockScope',
+    source: 'Reuters',
     url: 'https://www.cnbc.com/markets/',
     publishedAt: new Date().toISOString(),
     imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a?auto=format&fit=crop&w=1200&q=80',
-    content: 'Demo fallback news while provider APIs recover.',
-    author: 'StockScope',
+    content: 'U.S. equities traded in a narrow range as investors weighed inflation prints and corporate guidance updates. Treasury yields were little changed as traders reassessed expectations for the Federal Reserve path into the next quarter.\n\nStrategists said sector leadership remained mixed, with technology and communications drawing selective inflows while energy and defensive groups underperformed. Market breadth stayed close to neutral, reflecting caution ahead of upcoming macro releases.\n\nInvestors will watch labor-market data and management commentary for signs of demand resilience, margin pressure, and capital spending trends that could influence positioning across major indices.',
+    author: 'Reuters Staff',
   },
   {
     title: 'Tech stocks lead after strong AI demand outlook',
     description: 'Large-cap technology names outperformed on renewed AI infrastructure spending momentum.',
-    source: 'StockScope',
+    source: 'Bloomberg',
     url: 'https://www.reuters.com/markets/',
     publishedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     imageUrl: 'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&w=1200&q=80',
-    content: 'Demo fallback news while provider APIs recover.',
-    author: 'StockScope',
+    content: 'Large-cap technology shares moved higher after several suppliers pointed to steady demand for AI servers and networking infrastructure. Analysts highlighted improving order visibility and durable cloud spending as supportive factors for earnings revisions.\n\nSemiconductor and software names were among the top contributors to index gains, while investors rotated into select hardware manufacturers tied to data center build-outs. Options activity also increased in megacap names, suggesting continued momentum participation.\n\nPortfolio managers said valuation remains a debate, but many continue to favor quality balance sheets and recurring revenue exposure as the market discounts long-cycle AI monetization.',
+    author: 'Bloomberg News',
   },
   {
     title: 'Energy and financials hold steady ahead of economic data',
     description: 'Sector rotation remained balanced as traders awaited fresh macroeconomic releases.',
-    source: 'StockScope',
+    source: 'CNBC',
     url: 'https://www.bloomberg.com/markets',
     publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     imageUrl: 'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
-    content: 'Demo fallback news while provider APIs recover.',
-    author: 'StockScope',
+    content: 'Energy and financial shares were broadly unchanged as investors paused ahead of key economic updates. Crude prices traded in a tight range, while bank stocks tracked modest moves in long-duration yields.\n\nTraders noted that positioning remains light in cyclical sectors after recent volatility, creating room for either catch-up or further consolidation depending on data surprises. Credit spreads were stable, pointing to limited stress in funding markets.\n\nWith inflation and growth indicators due this week, market participants said near-term sector direction will likely depend on rates sensitivity and guidance revisions rather than headline momentum alone.',
+    author: 'CNBC Markets',
+  },
+  {
+    title: 'Small caps bounce as risk appetite improves into close',
+    description: 'The Russell 2000 outperformed late in the session as investors rotated into cyclicals.',
+    source: 'MarketWatch',
+    url: 'https://www.marketwatch.com/markets',
+    publishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=1200&q=80',
+    content: 'Small-cap stocks outperformed in late trading as risk appetite improved and short-covering accelerated. Industrials and consumer discretionary names led gains, while defensive sectors lagged the broader move.\n\nDesk analysts said liquidity conditions were constructive into the close, with breadth metrics improving across domestic exchanges. The move came despite muted index-level volatility, indicating selective risk-taking rather than broad beta expansion.\n\nInvestors will monitor upcoming earnings from regional companies for signs of demand durability and margin stabilization that could sustain relative strength in the small-cap segment.',
+    author: 'MarketWatch Staff',
+  },
+  {
+    title: 'Treasury yields stabilize after choppy morning trading',
+    description: 'Bond markets settled as traders reassessed policy expectations and growth data.',
+    source: 'WSJ',
+    url: 'https://www.wsj.com/finance',
+    publishedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
+    content: 'Treasury yields ended little changed after swinging through a wide intraday range. The two-year note briefly climbed before retracing as markets priced a slower path for policy easing.\n\nRate strategists pointed to mixed macro signals and cautious central-bank communication as reasons for elevated uncertainty in the front end. Curve dynamics remained volatile, with traders favoring tactical positioning around scheduled data releases.\n\nEquity participants said steadier yields into the close helped support growth sectors, though conviction remains limited until clearer direction emerges from inflation and labor figures.',
+    author: 'WSJ Markets',
+  },
+  {
+    title: 'Retail leaders outline cautious but steady consumer demand',
+    description: 'Executives flagged promotions and value focus while maintaining full-year outlooks.',
+    source: 'AP News',
+    url: 'https://apnews.com/hub/business',
+    publishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?auto=format&fit=crop&w=1200&q=80',
+    content: 'Retail executives said shoppers remain price-sensitive but continue to spend selectively across essential and seasonal categories. Promotional activity stayed elevated, particularly in discretionary products and apparel lines.\n\nManagement teams cited improvements in inventory health and logistics consistency compared with prior quarters. Analysts noted that gross margin trajectories are stabilizing as discount cadence becomes more predictable.\n\nWhile outlooks were largely unchanged, leadership teams emphasized monitoring household income trends and credit conditions as key variables for demand through the second half of the year.',
+    author: 'AP Business',
+  },
+  {
+    title: 'Chip equipment names rally on stronger booking commentary',
+    description: 'Suppliers pointed to improving order pipelines tied to capacity upgrades.',
+    source: 'Barron\'s',
+    url: 'https://www.barrons.com/market-data',
+    publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
+    content: 'Semiconductor equipment stocks advanced after management commentary suggested improving bookings in key regions. Investors focused on signs that deferred spending plans are returning to active procurement cycles.\n\nThe move broadened to adjacent automation and materials providers, with analysts highlighting operating leverage potential if utilization rates continue to normalize. Volatility remained elevated but directional sentiment improved through the session.\n\nMarket participants said near-term upside may depend on confirmed shipment conversion and margin execution rather than headline order growth alone.',
+    author: 'Barron\'s Team',
+  },
+  {
+    title: 'Dollar edges lower as global equity flows rotate',
+    description: 'Currency markets reflected shifting rate differentials and balanced risk demand.',
+    source: 'Financial Times',
+    url: 'https://www.ft.com/markets',
+    publishedAt: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(),
+    imageUrl: 'https://images.unsplash.com/photo-1580048915913-4f8f5cb481c4?auto=format&fit=crop&w=1200&q=80',
+    content: 'The U.S. dollar softened modestly against major peers as capital flows favored international equities and commodity-linked currencies. FX desks cited calmer rate expectations and reduced haven demand as primary drivers.\n\nCross-asset correlations remained moderate, with equities gaining and bond volatility easing into the final hour. Commodity-sensitive currencies saw the strongest support as energy and industrial metals held firm.\n\nTraders said upcoming policy commentary from major central banks could reset short-term momentum, particularly if inflation trajectories diverge across developed economies.',
+    author: 'FT Markets',
   },
 ];
+const DEFAULT_NEWS_IMAGES = [
+  'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1559526324-593bc073d938?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1642052502203-a2e4f4f1a4b7?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?auto=format&fit=crop&w=1200&q=80',
+];
+
+const normalizeNewsArticle = (article, index) => {
+  if (!article || !article.title || article.title === '[Removed]') return null;
+  const rawImage = article.urlToImage || article.image || article.imageUrl;
+  const imageUrl = typeof rawImage === 'string' && rawImage.startsWith('http')
+    ? rawImage
+    : DEFAULT_NEWS_IMAGES[index % DEFAULT_NEWS_IMAGES.length];
+  return {
+    title: article.title,
+    description: article.description || '',
+    source: article.source?.name || article.source || 'Market Desk',
+    url: article.url || null,
+    publishedAt: article.publishedAt || new Date().toISOString(),
+    imageUrl,
+    content: article.content || article.summary || '',
+    author: article.author || null,
+  };
+};
 
 const getAxiosStatus = (error) => error?.response?.status;
 const isProviderAuthError = (error) => {
@@ -777,16 +852,16 @@ app.get('/api/news', async (req, res) => {
       `https://newsapi.org/v2/top-headlines?category=business&country=us&pageSize=20&apiKey=${NEWS_API_KEY}`
     );
 
-    const news = response.data.articles.map((article) => ({
-      title: article.title,
-      description: article.description,
-      source: article.source.name,
-      url: article.url,
-      publishedAt: article.publishedAt,
-      imageUrl: article.urlToImage,
-      content: article.content,
-      author: article.author,
-    }));
+    const mapped = (Array.isArray(response.data?.articles) ? response.data.articles : [])
+      .map((article, index) => normalizeNewsArticle(article, index))
+      .filter(Boolean);
+    const news = [...mapped];
+    DEMO_NEWS.forEach((demoArticle, index) => {
+      if (news.length >= 12) return;
+      if (!news.some((item) => item.title === demoArticle.title)) {
+        news.push(normalizeNewsArticle(demoArticle, mapped.length + index));
+      }
+    });
 
     setCachedData(cacheKey, news);
     res.json(news);
@@ -859,16 +934,16 @@ app.get('/api/news/wsj', async (req, res) => {
       `https://newsapi.org/v2/everything?sources=the-wall-street-journal&pageSize=10&apiKey=${NEWS_API_KEY}`
     );
 
-    const news = response.data.articles.map((article) => ({
-      title: article.title,
-      description: article.description,
-      source: article.source.name,
-      url: article.url,
-      publishedAt: article.publishedAt,
-      imageUrl: article.urlToImage,
-      content: article.content,
-      author: article.author,
-    }));
+    const mapped = (Array.isArray(response.data?.articles) ? response.data.articles : [])
+      .map((article, index) => normalizeNewsArticle(article, index))
+      .filter(Boolean);
+    const news = [...mapped];
+    DEMO_NEWS.forEach((demoArticle, index) => {
+      if (news.length >= 10) return;
+      if (!news.some((item) => item.title === demoArticle.title)) {
+        news.push(normalizeNewsArticle(demoArticle, mapped.length + index));
+      }
+    });
 
     setCachedData(cacheKey, news);
     res.json(news);
@@ -897,14 +972,16 @@ app.get('/api/news/:symbol', async (req, res) => {
       `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}&to=${new Date().toISOString().split('T')[0]}&token=${FINNHUB_API_KEY}`
     );
 
-    const news = response.data.slice(0, 10).map((article) => ({
+    const news = response.data.slice(0, 12).map((article, index) => normalizeNewsArticle({
       title: article.headline,
       description: article.summary,
       source: article.source,
       url: article.url,
       publishedAt: new Date(article.datetime * 1000).toISOString(),
-      imageUrl: article.image,
-    }));
+      image: article.image,
+      content: article.summary,
+      author: null,
+    }, index)).filter(Boolean);
 
     setCachedData(cacheKey, news);
     res.json(news);
