@@ -563,13 +563,6 @@ export default function HomeScreen() {
                 {formatPortfolioHoverTime(portfolioDisplayTime, selectedPortfolioRange)}
               </Text>
             </View>
-            <TouchableOpacity
-              style={[styles.portfolioBadge, { backgroundColor: '#f5be41' }]}
-              onPress={() => navigation.navigate('Profile')}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.portfolioBadgeText}>$1M pie</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.portfolioBigChartWrap}>
@@ -1207,16 +1200,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '600',
-  },
-  portfolioBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  portfolioBadgeText: {
-    color: '#111111',
-    fontSize: 14,
-    fontWeight: '800',
   },
   portfolioBigChartWrap: {
     marginTop: 8,
