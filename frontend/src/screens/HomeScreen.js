@@ -8,8 +8,9 @@ import {
   useWindowDimensions,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { Text, ActivityIndicator, Button } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { stockAPI } from '../utils/api';
@@ -17,6 +18,7 @@ import { useWatchlist } from '../context/WatchlistContext';
 import { usePortfolio } from '../context/PortfolioContext';
 import { useTheme } from 'react-native-paper';
 import StockScopeLogo from '../components/StockScopeLogo';
+import { useAuth } from '../context/AuthContext';
 
 const RANGE_SECONDS = {
   LIVE: 24 * 60 * 60,
@@ -80,6 +82,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { watchlist } = useWatchlist();
   const { portfolio, refreshPortfolioValuation } = usePortfolio();
+  const { userProfile } = useAuth();
   const theme = useTheme();
   const portfolioTotal = portfolio?.totalValue ?? portfolio?.cash ?? 0;
   const buyingPower = portfolio?.cash ?? 0;
@@ -465,6 +468,7 @@ export default function HomeScreen() {
     const index = Math.round((clampedX / portfolioChartWidth) * (chartPointCount - 1));
     setHoveredPortfolioIndex(Math.max(0, Math.min(chartPointCount - 1, index)));
   };
+  const needsLocationPrompt = Boolean(userProfile && (!userProfile.country || !userProfile.state));
 
   const formatMoney = (value) => {
     const numeric = Number(value || 0);
@@ -901,6 +905,22 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.bottomPadding} />
+
+      <Modal visible={needsLocationPrompt} transparent animationType="fade">
+        <View style={styles.locationPromptBackdrop}>
+          <View style={[styles.locationPromptCard, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.locationPromptTitle, { color: theme.colors.text }]}>
+              Complete Your Location
+            </Text>
+            <Text style={[styles.locationPromptText, { color: theme.colors.placeholder }]}>
+              Please set your country and state/region in Profile.
+            </Text>
+            <Button mode="contained" onPress={() => navigation.navigate('Profile')} buttonColor={theme.colors.primary} textColor="#000">
+              Go to Profile
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1054,6 +1074,25 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  locationPromptBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  locationPromptCard: {
+    borderRadius: 14,
+    padding: 16,
+  },
+  locationPromptTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  locationPromptText: {
+    fontSize: 14,
+    marginBottom: 14,
   },
   emptyMarketCard: {
     borderRadius: 14,

@@ -1,10 +1,13 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
+
+const DEPLOYED_API_BASE_URL = 'https://stock-scope-falih-faizals-projects.vercel.app/api';
 
 const getApiBaseUrl = () => {
   const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
   if (envBase) return envBase;
 
-  if (typeof window !== 'undefined' && window?.location) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window?.location) {
     const { hostname, origin } = window.location;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3000/api';
@@ -12,7 +15,7 @@ const getApiBaseUrl = () => {
     if (origin) return `${origin}/api`;
   }
 
-  return 'http://localhost:3000/api';
+  return DEPLOYED_API_BASE_URL;
 };
 
 const API_BASE_URL = getApiBaseUrl();

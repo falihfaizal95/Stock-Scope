@@ -14,6 +14,7 @@ import { auth, db } from '../utils/firebase';
 const DEMO_MODE = false;
 
 const AuthContext = createContext({});
+const getProfileFallbackKey = (uid) => `user_profile_fallback_${uid}`;
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -53,9 +54,24 @@ export const AuthProvider = ({ children }) => {
             const profileDoc = await getDoc(doc(db, 'users', user.uid));
             if (profileDoc.exists()) {
               setUserProfile(profileDoc.data());
+            } else if (typeof localStorage !== 'undefined') {
+              const fallback = localStorage.getItem(getProfileFallbackKey(user.uid));
+              if (fallback) {
+                setUserProfile(JSON.parse(fallback));
+              }
             }
           } catch (error) {
             console.error('Error fetching user profile:', error);
+            if (typeof localStorage !== 'undefined') {
+              try {
+                const fallback = localStorage.getItem(getProfileFallbackKey(user.uid));
+                if (fallback) {
+                  setUserProfile(JSON.parse(fallback));
+                }
+              } catch (parseError) {
+                console.error('Error loading local profile fallback:', parseError);
+              }
+            }
           }
         } else {
           setUserProfile(null);
@@ -100,24 +116,27 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Save user profile to Firestore
+      const normalizedProfile = {
+        email: email,
+        fullName: profileData.fullName || '',
+        birthday: profileData.birthday || '',
+        occupation: profileData.occupation || '',
+        country: profileData.country || '',
+        state: profileData.state || '',
+        createdAt: new Date().toISOString(),
+        profilePicture: null,
+      };
+
       if (userCredential.user) {
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          email: email,
-          fullName: profileData.fullName || '',
-          birthday: profileData.birthday || '',
-          occupation: profileData.occupation || '',
-          state: profileData.state || '',
-          createdAt: new Date().toISOString(),
-          profilePicture: null,
-        });
-        setUserProfile({
-          fullName: profileData.fullName || '',
-          birthday: profileData.birthday || '',
-          occupation: profileData.occupation || '',
-          state: profileData.state || '',
-        });
+        try {
+          await setDoc(doc(db, 'users', userCredential.user.uid), normalizedProfile);
+        } catch (error) {
+          console.error('Profile write failed (continuing sign-up):', error);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(getProfileFallbackKey(userCredential.user.uid), JSON.stringify(normalizedProfile));
+          }
+        }
+        setUserProfile(normalizedProfile);
       }
       
       return { success: true, user: userCredential.user };
@@ -149,6 +168,16 @@ export const AuthProvider = ({ children }) => {
       setUserProfile({ ...userProfile, ...updates });
       return { success: true };
     } catch (error) {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const merged = { ...(userProfile || {}), ...updates };
+          localStorage.setItem(getProfileFallbackKey(user.uid), JSON.stringify(merged));
+          setUserProfile(merged);
+          return { success: true, localOnly: true };
+        } catch (fallbackError) {
+          return { success: false, error: fallbackError.message || error.message };
+        }
+      }
       return { success: false, error: error.message };
     }
   };
@@ -169,4 +198,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
