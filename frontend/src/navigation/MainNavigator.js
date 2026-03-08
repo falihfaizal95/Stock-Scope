@@ -60,7 +60,7 @@ function HomeTabs() {
         tabBarActiveTintColor: '#34c759', // Apple Green
         tabBarInactiveTintColor: '#8e8e93',
         tabBarStyle: {
-          backgroundColor: '#1c1c1e',
+          backgroundColor: '#000000',
           borderTopWidth: 0,
           borderTopColor: 'transparent',
           paddingBottom: Platform.OS === 'ios' ? 20 : 12,

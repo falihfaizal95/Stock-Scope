@@ -79,6 +79,7 @@ export default function HomeScreen() {
   const [liveIndicatorOn, setLiveIndicatorOn] = useState(true);
   const [liveRefreshTick, setLiveRefreshTick] = useState(0);
   const [hoveredPortfolioIndex, setHoveredPortfolioIndex] = useState(null);
+  const [brokenLogos, setBrokenLogos] = useState({});
   const navigation = useNavigation();
   const { watchlist } = useWatchlist();
   const { portfolio, refreshPortfolioValuation } = usePortfolio();
@@ -307,6 +308,8 @@ export default function HomeScreen() {
     return data;
   };
 
+  const isLogoUsable = (symbol, logo) => Boolean(logo) && !brokenLogos[String(symbol || '').toUpperCase()];
+
   const renderStockCard = (stock, index) => {
     const isPositive = stock.changePercent >= 0;
     const chartData = generateChartData(isPositive);
@@ -326,10 +329,11 @@ export default function HomeScreen() {
       >
         <View style={styles.stockCardContent}>
           <View style={styles.stockHeader}>
-            {stock.logo ? (
+            {isLogoUsable(stock.symbol, stock.logo) ? (
               <Image 
                 source={{ uri: stock.logo }} 
                 style={styles.logo}
+                onError={() => setBrokenLogos((prev) => ({ ...prev, [String(stock.symbol || '').toUpperCase()]: true }))}
               />
             ) : (
               <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
@@ -819,11 +823,19 @@ export default function HomeScreen() {
               >
                 <View style={styles.stockCardContent}>
                   <View style={styles.stockHeader}>
-                    <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
-                      <Text style={[styles.logoText, { color: theme.colors.placeholder }]}>
-                        {item.symbol.charAt(0)}
-                      </Text>
-                    </View>
+                    {isLogoUsable(item.symbol, item.logo) ? (
+                      <Image
+                        source={{ uri: item.logo }}
+                        style={styles.logo}
+                        onError={() => setBrokenLogos((prev) => ({ ...prev, [String(item.symbol || '').toUpperCase()]: true }))}
+                      />
+                    ) : (
+                      <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
+                        <Text style={[styles.logoText, { color: theme.colors.placeholder }]}>
+                          {item.symbol.charAt(0)}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.stockInfo}>
                       <Text style={[styles.stockSymbol, { color: theme.colors.text }]}>
                         {item.symbol}

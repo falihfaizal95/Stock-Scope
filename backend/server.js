@@ -192,39 +192,8 @@ const buildSeededNewsImage = (article, index) => {
 };
 
 const ensureDiverseNewsImages = (articles = []) => {
-  const usedImageKeys = new Set();
-  let fallbackCursor = 0;
-
   return articles.map((article, index) => {
-    const currentImage = article?.imageUrl || '';
-    const currentKey = normalizeImageKey(currentImage);
-    let nextImage = currentImage;
-
-    if (!currentImage || usedImageKeys.has(currentKey)) {
-      const seededImage = buildSeededNewsImage(article, index);
-      if (!usedImageKeys.has(normalizeImageKey(seededImage))) {
-        nextImage = seededImage;
-      } else {
-        let chosen = null;
-        for (let attempt = 0; attempt < DEFAULT_NEWS_IMAGES.length; attempt += 1) {
-          const candidate = DEFAULT_NEWS_IMAGES[(fallbackCursor + index + attempt) % DEFAULT_NEWS_IMAGES.length];
-          const candidateKey = normalizeImageKey(candidate);
-          if (!usedImageKeys.has(candidateKey)) {
-            chosen = candidate;
-            fallbackCursor = (fallbackCursor + attempt + 1) % DEFAULT_NEWS_IMAGES.length;
-            break;
-          }
-        }
-
-        if (!chosen) {
-          chosen = DEFAULT_NEWS_IMAGES[(fallbackCursor + index) % DEFAULT_NEWS_IMAGES.length];
-          fallbackCursor = (fallbackCursor + 1) % DEFAULT_NEWS_IMAGES.length;
-        }
-        nextImage = chosen;
-      }
-    }
-
-    usedImageKeys.add(normalizeImageKey(nextImage));
+    const nextImage = buildSeededNewsImage(article, index);
     return {
       ...article,
       imageUrl: nextImage,

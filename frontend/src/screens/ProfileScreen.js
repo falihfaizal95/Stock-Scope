@@ -25,11 +25,22 @@ export default function ProfileScreen() {
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
+  const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
+  const [editFullName, setEditFullName] = useState(userProfile?.fullName || '');
+  const [editBirthday, setEditBirthday] = useState(userProfile?.birthday || '');
+  const [editOccupation, setEditOccupation] = useState(userProfile?.occupation || '');
+  const [editCountryName, setEditCountryName] = useState(userProfile?.countryName || '');
+  const [editStateRegion, setEditStateRegion] = useState(userProfile?.state || '');
 
   useEffect(() => {
     setCountryCode(userProfile?.country || '');
     setCountryName(userProfile?.countryName || '');
     setStateRegion(userProfile?.state || '');
+    setEditFullName(userProfile?.fullName || '');
+    setEditBirthday(userProfile?.birthday || '');
+    setEditOccupation(userProfile?.occupation || '');
+    setEditCountryName(userProfile?.countryName || '');
+    setEditStateRegion(userProfile?.state || '');
     if (user && userProfile && (!userProfile.country || !userProfile.state)) {
       setLocationPromptVisible(true);
     }
@@ -91,6 +102,23 @@ export default function ProfileScreen() {
       await updateProfile({ profilePicture: result.assets[0].uri });
       Alert.alert('Success', 'Profile picture updated!');
     }
+  };
+
+  const savePersonalInfo = async () => {
+    const payload = {
+      fullName: editFullName.trim(),
+      birthday: editBirthday.trim(),
+      occupation: editOccupation.trim(),
+      countryName: editCountryName.trim(),
+      state: editStateRegion.trim(),
+    };
+    const result = await updateProfile(payload);
+    if (!result.success) {
+      Alert.alert('Update failed', result.error || 'Unable to update profile.');
+      return;
+    }
+    setIsEditingPersonalInfo(false);
+    Alert.alert('Saved', 'Personal information updated.');
   };
 
   return (
@@ -180,6 +208,21 @@ export default function ProfileScreen() {
         <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Account Information</Text>
         <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
         <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Full Name</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.text }]}>{userProfile?.fullName || 'N/A'}</Text>
+        </View>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Birthday</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.text }]}>{userProfile?.birthday || 'N/A'}</Text>
+        </View>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Occupation</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.text }]}>{userProfile?.occupation || 'N/A'}</Text>
+        </View>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        <View style={styles.infoRow}>
           <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>Country</Text>
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>{userProfile?.countryName || 'N/A'}</Text>
         </View>
@@ -188,6 +231,59 @@ export default function ProfileScreen() {
           <Text style={[styles.infoLabel, { color: theme.colors.placeholder }]}>State</Text>
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>{userProfile?.state || 'N/A'}</Text>
         </View>
+        <View style={styles.editActions}>
+          <Button
+            mode={isEditingPersonalInfo ? 'outlined' : 'contained'}
+            onPress={() => setIsEditingPersonalInfo((prev) => !prev)}
+            buttonColor={isEditingPersonalInfo ? undefined : theme.colors.primary}
+            textColor={isEditingPersonalInfo ? theme.colors.text : '#000'}
+          >
+            {isEditingPersonalInfo ? 'Cancel edit' : 'Edit personal info'}
+          </Button>
+        </View>
+        {isEditingPersonalInfo ? (
+          <View style={styles.editForm}>
+            <TextInput
+              mode="outlined"
+              label="Full Name"
+              value={editFullName}
+              onChangeText={setEditFullName}
+              style={styles.editInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="Birthday"
+              value={editBirthday}
+              onChangeText={setEditBirthday}
+              placeholder="MM/DD/YYYY"
+              style={styles.editInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="Occupation"
+              value={editOccupation}
+              onChangeText={setEditOccupation}
+              style={styles.editInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="Country"
+              value={editCountryName}
+              onChangeText={setEditCountryName}
+              style={styles.editInput}
+            />
+            <TextInput
+              mode="outlined"
+              label="State / Region"
+              value={editStateRegion}
+              onChangeText={setEditStateRegion}
+              style={styles.editInput}
+            />
+            <Button mode="contained" onPress={savePersonalInfo} buttonColor={theme.colors.primary} textColor="#000">
+              Save changes
+            </Button>
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -326,6 +422,9 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   infoLabel: { fontSize: 16 },
   infoValue: { fontSize: 14, fontWeight: '600' },
+  editActions: { marginTop: 14 },
+  editForm: { marginTop: 14 },
+  editInput: { marginBottom: 2 },
   buttonContainer: { paddingHorizontal: 16, marginTop: 8, marginBottom: 20 },
   holdingItem: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, marginBottom: 10, borderWidth: 1 },
   holdingSymbol: { fontSize: 18, fontWeight: '700', marginBottom: 4 },

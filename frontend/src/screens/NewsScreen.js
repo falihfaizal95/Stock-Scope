@@ -28,6 +28,27 @@ const DEFAULT_NEWS_IMAGES = [
 const hashString = (value = '') =>
   String(value).split('').reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
 
+const normalizeImageKey = (uri = '') => {
+  if (!uri || typeof uri !== 'string') return '';
+  try {
+    const parsed = new URL(uri);
+    return `${parsed.hostname.replace(/^www\./, '')}${parsed.pathname}`;
+  } catch (error) {
+    return uri;
+  }
+};
+
+const buildSeededFallbackImage = (article, index, attempt = 0) => {
+  const seed = encodeURIComponent(
+    `${article?.source || 'source'}-${article?.title || 'headline'}-${index}-${attempt}`
+      .toLowerCase()
+      .replace(/[^a-z0-9\- ]/g, ' ')
+      .trim()
+      .replace(/\s+/g, '-')
+  );
+  return `https://picsum.photos/seed/${seed}/1200/800`;
+};
+
 export default function NewsScreen() {
   const [news, setNews] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -71,19 +92,21 @@ export default function NewsScreen() {
   };
 
   const resolveImageForIndex = (article, index, usedUriCount) => {
-    const key = `${article.url || article.title || index}_${index}`;
-    const fallbackIndexOffset = imageErrorMap[key] || 0;
-    const hashSeed = hashString(`${article.source || ''}-${article.title || ''}`);
-    const fallbackImage = DEFAULT_NEWS_IMAGES[(hashSeed + fallbackIndexOffset) % DEFAULT_NEWS_IMAGES.length];
-    let primaryImage = fallbackIndexOffset > 0
-      ? fallbackImage
-      : (article.imageUrl || fallbackImage);
-    const duplicateCount = usedUriCount.get(primaryImage) || 0;
-    if (duplicateCount > 0) {
-      primaryImage = DEFAULT_NEWS_IMAGES[(hashSeed + duplicateCount + fallbackIndexOffset + index) % DEFAULT_NEWS_IMAGES.length];
+    const imageKey = `${article.url || article.title || index}_${index}`;
+    const retryAttempt = imageErrorMap[imageKey] || 0;
+    const hashSeed = hashString(`${article.source || ''}-${article.title || ''}-${index}`);
+    const stableFallback = DEFAULT_NEWS_IMAGES[hashSeed % DEFAULT_NEWS_IMAGES.length];
+    let imageUri = retryAttempt > 0
+      ? buildSeededFallbackImage(article, index, retryAttempt)
+      : (article.imageUrl || stableFallback);
+
+    let normalizedKey = normalizeImageKey(imageUri);
+    if (!normalizedKey || usedUriCount.has(normalizedKey)) {
+      imageUri = buildSeededFallbackImage(article, index, retryAttempt + 1);
+      normalizedKey = normalizeImageKey(imageUri);
     }
-    usedUriCount.set(primaryImage, (usedUriCount.get(primaryImage) || 0) + 1);
-    return { imageUri: primaryImage, imageKey: key };
+    usedUriCount.set(normalizedKey, true);
+    return { imageUri, imageKey };
   };
 
   if (loading) {

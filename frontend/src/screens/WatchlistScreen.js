@@ -41,6 +41,7 @@ export default function WatchlistScreen() {
   const [priceMap, setPriceMap] = useState({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [brokenLogos, setBrokenLogos] = useState({});
 
   useEffect(() => {
     fetchCurrentPrices();
@@ -87,6 +88,8 @@ export default function WatchlistScreen() {
     setRefreshing(true);
     fetchCurrentPrices();
   };
+
+  const isLogoUsable = (symbol, logo) => Boolean(logo) && !brokenLogos[String(symbol || '').toUpperCase()];
 
   const getPerformance = (item) => {
     const current = priceMap[item.symbol];
@@ -154,8 +157,12 @@ export default function WatchlistScreen() {
               >
                 <View style={styles.rowTop}>
                   <View style={styles.stockIdentity}>
-                    {item.logo ? (
-                      <Image source={{ uri: item.logo }} style={styles.logo} />
+                    {isLogoUsable(item.symbol, item.logo) ? (
+                      <Image
+                        source={{ uri: item.logo }}
+                        style={styles.logo}
+                        onError={() => setBrokenLogos((prev) => ({ ...prev, [String(item.symbol || '').toUpperCase()]: true }))}
+                      />
                     ) : (
                       <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
                         <Text style={[styles.logoText, { color: theme.colors.placeholder }]}>

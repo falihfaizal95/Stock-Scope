@@ -171,7 +171,7 @@ export default function StockDetailScreen() {
     navigation.setOptions({
       headerShown: true,
       title: symbol,
-      headerStyle: { backgroundColor: '#1c1c1e' },
+      headerStyle: { backgroundColor: '#000000' },
       headerTintColor: '#ffffff',
       headerTitleStyle: { fontWeight: '700' },
     });

@@ -26,6 +26,7 @@ export default function SearchScreen() {
   const [cryptoMovers, setCryptoMovers] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [initialDataError, setInitialDataError] = useState('');
+  const [brokenLogos, setBrokenLogos] = useState({});
   const navigation = useNavigation();
   const theme = useTheme();
 
@@ -100,6 +101,8 @@ export default function SearchScreen() {
     return data;
   };
 
+  const isLogoUsable = (symbol, logo) => Boolean(logo) && !brokenLogos[symbol];
+
   const renderStockItem = ({ item }) => {
     const isPositive = item.changePercent >= 0;
     const chartData = generateChartData(isPositive);
@@ -112,10 +115,11 @@ export default function SearchScreen() {
       >
         <View style={[styles.stockCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.stockRow}>
-            {item.logo ? (
+            {isLogoUsable(item.symbol, item.logo) ? (
               <Image 
                 source={{ uri: item.logo }} 
                 style={styles.logo}
+                onError={() => setBrokenLogos((prev) => ({ ...prev, [item.symbol]: true }))}
               />
             ) : (
               <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
@@ -224,10 +228,11 @@ export default function SearchScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.stockRow}>
-          {stock.logo ? (
+          {isLogoUsable(stock.symbol, stock.logo) ? (
             <Image 
               source={{ uri: stock.logo }} 
               style={styles.logo}
+              onError={() => setBrokenLogos((prev) => ({ ...prev, [stock.symbol]: true }))}
             />
           ) : (
             <View style={[styles.logo, styles.logoPlaceholder, { backgroundColor: theme.colors.border }]}>
