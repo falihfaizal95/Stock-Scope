@@ -321,7 +321,7 @@ export default function HomeScreen() {
         key={stock.symbol || index}
         onPress={() => navigation.navigate('StockDetail', { symbol: stock.symbol })}
         style={[styles.stockCard, { 
-          backgroundColor: theme.colors.surface,
+          backgroundColor: '#000000',
           width: cardWidth,
           marginRight: isEndOfRow ? 0 : gridGap,
         }]}
@@ -513,7 +513,7 @@ export default function HomeScreen() {
       </View>
 
       {portfolio && (
-        <View style={[styles.portfolioCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.portfolioCard, { backgroundColor: '#000000' }]}>
           <View style={styles.portfolioHeaderRow}>
             <View>
               <Text style={[styles.portfolioAccountType, { color: theme.colors.text }]}>
@@ -791,7 +791,7 @@ export default function HomeScreen() {
 
       {topGainers.length === 0 && topLosers.length === 0 && crypto.length === 0 && (
         <View style={styles.section}>
-          <View style={[styles.emptyMarketCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.emptyMarketCard, { backgroundColor: '#000000' }]}>
             <Text style={[styles.emptyMarketTitle, { color: theme.colors.text }]}>
               Market data temporarily unavailable
             </Text>
@@ -818,7 +818,7 @@ export default function HomeScreen() {
                 onPress={() =>
                   navigation.navigate('StockDetail', { symbol: item.symbol })
                 }
-                style={[styles.stockCard, { backgroundColor: theme.colors.surface }]}
+                style={[styles.stockCard, { backgroundColor: '#000000' }]}
                 activeOpacity={0.7}
               >
                 <View style={styles.stockCardContent}>
@@ -920,7 +920,7 @@ export default function HomeScreen() {
 
       <Modal visible={needsLocationPrompt} transparent animationType="fade">
         <View style={styles.locationPromptBackdrop}>
-          <View style={[styles.locationPromptCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.locationPromptCard, { backgroundColor: '#000000' }]}>
             <Text style={[styles.locationPromptTitle, { color: theme.colors.text }]}>
               Complete Your Location
             </Text>

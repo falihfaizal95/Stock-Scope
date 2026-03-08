@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   headerImage: {
     width: screenWidth,
     height: 250,
-    backgroundColor: '#2c2c2e',
+    backgroundColor: '#000000',
   },
   content: {
     padding: 20,

@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   newsImage: {
     width: '100%',
     height: 150,
-    backgroundColor: '#2c2c2e',
+    backgroundColor: '#000000',
     alignSelf: 'center',
   },
   newsImagePlaceholder: {

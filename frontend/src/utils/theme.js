@@ -21,6 +21,17 @@ export const darkTheme = {
     negative: '#ff3b30',
     placeholder: '#8e8e93',
     backdrop: 'rgba(0, 0, 0, 0.5)',
+    surfaceVariant: '#000000',
+    surfaceDisabled: '#000000',
+    inverseSurface: '#000000',
+    elevation: {
+      level0: '#000000',
+      level1: '#000000',
+      level2: '#000000',
+      level3: '#000000',
+      level4: '#000000',
+      level5: '#000000',
+    },
   },
   fonts: {
     ...MD3DarkTheme.fonts,
