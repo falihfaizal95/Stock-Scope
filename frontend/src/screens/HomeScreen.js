@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import {
   View,
   StyleSheet,
@@ -424,6 +424,24 @@ export default function HomeScreen() {
     );
   };
 
+  const renderStockGrid = (items = []) =>
+    items.map((stock, index) => (
+      <Fragment key={`${stock.symbol || 'stock'}-${index}`}>
+        {renderStockCard(stock, index)}
+        {gridColumns === 1 && index < items.length - 1 ? (
+          <View
+            style={[
+              styles.cardDivider,
+              {
+                width: cardWidth,
+                borderTopColor: theme.colors.border,
+              },
+            ]}
+          />
+        ) : null}
+      </Fragment>
+    ));
+
   const portfolioDisplayTotal = portfolioChartData[portfolioChartData.length - 1] ?? portfolioTotal;
   const portfolioChartWidth = windowWidth - 72;
   const portfolioChartHeight = 180;
@@ -762,7 +780,7 @@ export default function HomeScreen() {
             Top Gainers
           </Text>
           <View style={styles.stockGrid}>
-            {topGainers.map((stock, index) => renderStockCard(stock, index))}
+            {renderStockGrid(topGainers)}
           </View>
         </View>
       )}
@@ -773,7 +791,7 @@ export default function HomeScreen() {
             Top Losers
           </Text>
           <View style={styles.stockGrid}>
-            {topLosers.map((stock, index) => renderStockCard(stock, index))}
+            {renderStockGrid(topLosers)}
           </View>
         </View>
       )}
@@ -784,7 +802,7 @@ export default function HomeScreen() {
             Cryptocurrency
           </Text>
           <View style={styles.stockGrid}>
-            {crypto.map((coin, index) => renderStockCard(coin, index))}
+            {renderStockGrid(crypto)}
           </View>
         </View>
       )}
@@ -1011,6 +1029,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
+  },
+  cardDivider: {
+    borderTopWidth: 1,
+    borderStyle: 'dotted',
+    marginTop: -2,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    opacity: 0.75,
   },
   stockCard: {
     padding: 12,
