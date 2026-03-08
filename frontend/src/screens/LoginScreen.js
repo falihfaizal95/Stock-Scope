@@ -206,7 +206,9 @@ export default function LoginScreen() {
                           alert('Select country first');
                           return;
                         }
-                        setStatePickerVisible(true);
+                        if (selectableStates.length > 0) {
+                          setStatePickerVisible(true);
+                        }
                       }}
                     >
                       <Text style={[styles.selectorLabel, { color: theme.colors.placeholder }]}>State / Region</Text>
@@ -216,9 +218,20 @@ export default function LoginScreen() {
                           { color: stateRegion ? theme.colors.text : theme.colors.placeholder },
                         ]}
                       >
-                        {stateRegion || 'Select state/region'}
+                        {stateRegion || (selectableStates.length > 0 ? 'Select state/region' : 'Enter state/region below')}
                       </Text>
                     </TouchableOpacity>
+
+                    {selectableStates.length === 0 && countryCode ? (
+                      <TextInput
+                        label="State / Region"
+                        value={stateRegion}
+                        onChangeText={setStateRegion}
+                        mode="outlined"
+                        style={styles.input}
+                        contentStyle={{ color: theme.colors.text }}
+                      />
+                    ) : null}
                   </>
                 )}
               </View>
@@ -407,4 +420,3 @@ const styles = StyleSheet.create({
   pickerItemText: { fontSize: 15, fontWeight: '600' },
   pickerEmptyText: { paddingVertical: 14, fontSize: 13 },
 });
-

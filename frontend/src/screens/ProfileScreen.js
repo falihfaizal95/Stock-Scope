@@ -222,14 +222,25 @@ export default function ProfileScreen() {
               style={[styles.locationSelector, { borderColor: theme.colors.border }]}
               onPress={() => {
                 if (!countryCode) return alert('Select country first');
-                setStatePickerVisible(true);
+                if (selectableStates.length > 0) {
+                  setStatePickerVisible(true);
+                }
               }}
             >
               <Text style={[styles.locationLabel, { color: theme.colors.placeholder }]}>State / Region</Text>
               <Text style={[styles.locationValue, { color: stateRegion ? theme.colors.text : theme.colors.placeholder }]}>
-                {stateRegion || 'Select state/region'}
+                {stateRegion || (selectableStates.length > 0 ? 'Select state/region' : 'Enter state/region below')}
               </Text>
             </TouchableOpacity>
+            {selectableStates.length === 0 && countryCode ? (
+              <TextInput
+                mode="outlined"
+                value={stateRegion}
+                onChangeText={setStateRegion}
+                placeholder="Enter state/region"
+                style={{ marginBottom: 10 }}
+              />
+            ) : null}
             <Button mode="contained" onPress={saveLocationPrompt} buttonColor={theme.colors.primary} textColor="#000">
               Save
             </Button>
@@ -340,4 +351,3 @@ const styles = StyleSheet.create({
   locationValue: { fontSize: 15, fontWeight: '600' },
   locationRow: { paddingVertical: 11, borderBottomWidth: 1 },
 });
-
