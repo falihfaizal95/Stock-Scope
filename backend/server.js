@@ -180,6 +180,17 @@ const normalizeImageKey = (uri) => {
   }
 };
 
+const buildSeededNewsImage = (article, index) => {
+  const seed = encodeURIComponent(
+    `${article?.source || 'source'}-${article?.title || 'headline'}-${index}`
+      .toLowerCase()
+      .replace(/[^a-z0-9\- ]/g, ' ')
+      .trim()
+      .replace(/\s+/g, '-')
+  );
+  return `https://picsum.photos/seed/${seed}/1200/800`;
+};
+
 const ensureDiverseNewsImages = (articles = []) => {
   const usedImageKeys = new Set();
   let fallbackCursor = 0;
@@ -190,22 +201,27 @@ const ensureDiverseNewsImages = (articles = []) => {
     let nextImage = currentImage;
 
     if (!currentImage || usedImageKeys.has(currentKey)) {
-      let chosen = null;
-      for (let attempt = 0; attempt < DEFAULT_NEWS_IMAGES.length; attempt += 1) {
-        const candidate = DEFAULT_NEWS_IMAGES[(fallbackCursor + index + attempt) % DEFAULT_NEWS_IMAGES.length];
-        const candidateKey = normalizeImageKey(candidate);
-        if (!usedImageKeys.has(candidateKey)) {
-          chosen = candidate;
-          fallbackCursor = (fallbackCursor + attempt + 1) % DEFAULT_NEWS_IMAGES.length;
-          break;
+      const seededImage = buildSeededNewsImage(article, index);
+      if (!usedImageKeys.has(normalizeImageKey(seededImage))) {
+        nextImage = seededImage;
+      } else {
+        let chosen = null;
+        for (let attempt = 0; attempt < DEFAULT_NEWS_IMAGES.length; attempt += 1) {
+          const candidate = DEFAULT_NEWS_IMAGES[(fallbackCursor + index + attempt) % DEFAULT_NEWS_IMAGES.length];
+          const candidateKey = normalizeImageKey(candidate);
+          if (!usedImageKeys.has(candidateKey)) {
+            chosen = candidate;
+            fallbackCursor = (fallbackCursor + attempt + 1) % DEFAULT_NEWS_IMAGES.length;
+            break;
+          }
         }
-      }
 
-      if (!chosen) {
-        chosen = DEFAULT_NEWS_IMAGES[(fallbackCursor + index) % DEFAULT_NEWS_IMAGES.length];
-        fallbackCursor = (fallbackCursor + 1) % DEFAULT_NEWS_IMAGES.length;
+        if (!chosen) {
+          chosen = DEFAULT_NEWS_IMAGES[(fallbackCursor + index) % DEFAULT_NEWS_IMAGES.length];
+          fallbackCursor = (fallbackCursor + 1) % DEFAULT_NEWS_IMAGES.length;
+        }
+        nextImage = chosen;
       }
-      nextImage = chosen;
     }
 
     usedImageKeys.add(normalizeImageKey(nextImage));
