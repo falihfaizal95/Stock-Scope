@@ -13,6 +13,7 @@ import {
 import { Text, ActivityIndicator, Button } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { stockAPI } from '../utils/api';
 import { useWatchlist } from '../context/WatchlistContext';
 import { usePortfolio } from '../context/PortfolioContext';
@@ -66,6 +67,7 @@ const normalizeSeriesToLength = (values, targetLength, fallbackValue) => {
 };
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [marketData, setMarketData] = useState(null);
   const [topGainers, setTopGainers] = useState([]);
@@ -515,7 +517,14 @@ export default function HomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />
       }
     >
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: Math.max(insets.top + 8, 20),
+          },
+        ]}
+      >
         <View style={styles.headerTop}>
           <StockScopeLogo size={40} />
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
