@@ -4,12 +4,12 @@ const getApiBaseUrl = () => {
   const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
   if (envBase) return envBase;
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window?.location) {
     const { hostname, origin } = window.location;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3000/api';
     }
-    return `${origin}/api`;
+    if (origin) return `${origin}/api`;
   }
 
   return 'http://localhost:3000/api';
