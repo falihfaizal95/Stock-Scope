@@ -60,12 +60,21 @@ export const globalTextStyles = StyleSheet.create({
 // Apply font to all Text components globally via App.js
 export const applyGlobalFonts = () => {
   if (Platform.OS === 'web') {
+    if (document.getElementById('stockscope-global-fonts')) return;
     const style = document.createElement('style');
+    style.id = 'stockscope-global-fonts';
     style.textContent = `
-      * {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+      html, body, button, input, textarea, select {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Keep icon font glyphs intact on web (Ionicons/react-native-vector-icons). */
+      [style*="Ionicons"],
+      [class*="icon"],
+      [data-icon] {
+        font-family: "Ionicons", "Material Icons", "FontAwesome", sans-serif !important;
       }
     `;
     document.head.appendChild(style);
