@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { useAuth } from './AuthContext';
@@ -7,6 +7,119 @@ import { stockAPI } from '../utils/api';
 const PortfolioContext = createContext({});
 const STARTING_CASH = 1000000;
 const getPortfolioFallbackKey = (uid) => `portfolio_fallback_${uid}`;
+const QUEUE_PROCESS_INTERVAL_MS = 15000;
+
+const getEasternDateParts = (date = new Date()) => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  });
+  const pieces = formatter.formatToParts(date);
+  const map = {};
+  pieces.forEach((item) => {
+    if (item.type !== 'literal') map[item.type] = item.value;
+  });
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    weekday: map.weekday,
+  };
+};
+
+const formatYmd = (year, month, day) =>
+  `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+const getWeekday = (year, month, day) => new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+const nthWeekdayOfMonth = (year, month, weekday, nth) => {
+  let count = 0;
+  for (let day = 1; day <= 31; day += 1) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1) break;
+    if (date.getUTCDay() === weekday) {
+      count += 1;
+      if (count === nth) return day;
+    }
+  }
+  return null;
+};
+
+const lastWeekdayOfMonth = (year, month, weekday) => {
+  for (let day = 31; day >= 1; day -= 1) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCMonth() !== month - 1) continue;
+    if (date.getUTCDay() === weekday) return day;
+  }
+  return null;
+};
+
+const observedHolidayYmd = (year, month, day) => {
+  const weekday = getWeekday(year, month, day);
+  if (weekday === 6) {
+    const observed = new Date(Date.UTC(year, month - 1, day - 1));
+    return formatYmd(observed.getUTCFullYear(), observed.getUTCMonth() + 1, observed.getUTCDate());
+  }
+  if (weekday === 0) {
+    const observed = new Date(Date.UTC(year, month - 1, day + 1));
+    return formatYmd(observed.getUTCFullYear(), observed.getUTCMonth() + 1, observed.getUTCDate());
+  }
+  return formatYmd(year, month, day);
+};
+
+const getGoodFridayDay = (year) => {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easterMonth = Math.floor((h + l - 7 * m + 114) / 31);
+  const easterDay = ((h + l - 7 * m + 114) % 31) + 1;
+  const easter = new Date(Date.UTC(year, easterMonth - 1, easterDay));
+  const goodFriday = new Date(easter.getTime() - 2 * 24 * 60 * 60 * 1000);
+  return formatYmd(goodFriday.getUTCFullYear(), goodFriday.getUTCMonth() + 1, goodFriday.getUTCDate());
+};
+
+const isUsMarketHoliday = (year, month, day) => {
+  const ymd = formatYmd(year, month, day);
+  const holidays = new Set([
+    observedHolidayYmd(year, 1, 1),
+    formatYmd(year, 1, nthWeekdayOfMonth(year, 1, 1, 3)),
+    formatYmd(year, 2, nthWeekdayOfMonth(year, 2, 1, 3)),
+    getGoodFridayDay(year),
+    formatYmd(year, 5, lastWeekdayOfMonth(year, 5, 1)),
+    observedHolidayYmd(year, 6, 19),
+    observedHolidayYmd(year, 7, 4),
+    formatYmd(year, 9, nthWeekdayOfMonth(year, 9, 1, 1)),
+    formatYmd(year, 11, nthWeekdayOfMonth(year, 11, 4, 4)),
+    observedHolidayYmd(year, 12, 25),
+  ]);
+  return holidays.has(ymd);
+};
+
+const isUsRegularMarketOpenEt = (date = new Date()) => {
+  const eastern = getEasternDateParts(date);
+  const isWeekend = eastern.weekday === 'Sat' || eastern.weekday === 'Sun';
+  if (isWeekend) return false;
+  if (isUsMarketHoliday(eastern.year, eastern.month, eastern.day)) return false;
+  const minutes = eastern.hour * 60 + eastern.minute;
+  return minutes >= 9 * 60 + 30 && minutes < 16 * 60;
+};
 
 export const usePortfolio = () => {
   const context = useContext(PortfolioContext);
@@ -23,8 +136,15 @@ export const PortfolioProvider = ({ children }) => {
     holdings: [],
     totalValue: STARTING_CASH,
     history: [],
+    queuedOrders: [],
   });
   const [loading, setLoading] = useState(true);
+  const portfolioRef = useRef(portfolio);
+  const processingQueuedOrdersRef = useRef(false);
+
+  useEffect(() => {
+    portfolioRef.current = portfolio;
+  }, [portfolio]);
 
   useEffect(() => {
     if (user) {
@@ -45,6 +165,7 @@ export const PortfolioProvider = ({ children }) => {
           holdings: [],
           totalValue: STARTING_CASH,
           history: [],
+          queuedOrders: [],
           ...portfolioDoc.data(),
         };
         setPortfolio(loadedPortfolio);
@@ -56,6 +177,7 @@ export const PortfolioProvider = ({ children }) => {
           holdings: [],
           totalValue: STARTING_CASH,
           history: [{ value: STARTING_CASH, timestamp: new Date().toISOString() }],
+          queuedOrders: [],
         };
         await setDoc(doc(db, 'portfolios', user.uid), initialPortfolio);
         setPortfolio(initialPortfolio);
@@ -71,6 +193,7 @@ export const PortfolioProvider = ({ children }) => {
               holdings: [],
               totalValue: STARTING_CASH,
               history: [],
+              queuedOrders: [],
               ...JSON.parse(fallback),
             };
             setPortfolio(localPortfolio);
@@ -81,6 +204,7 @@ export const PortfolioProvider = ({ children }) => {
               holdings: [],
               totalValue: STARTING_CASH,
               history: [{ value: STARTING_CASH, timestamp: new Date().toISOString() }],
+              queuedOrders: [],
             });
           }
         }
@@ -165,6 +289,17 @@ export const PortfolioProvider = ({ children }) => {
     }
   };
 
+  const persistPortfolio = async (updatedPortfolio) => {
+    setPortfolio(updatedPortfolio);
+    try {
+      await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
+    } catch (error) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
+      }
+    }
+  };
+
   useEffect(() => {
     if (!user) return undefined;
     const intervalId = setInterval(() => {
@@ -172,6 +307,135 @@ export const PortfolioProvider = ({ children }) => {
     }, 30000);
     return () => clearInterval(intervalId);
   }, [user, portfolio.cash, portfolio.holdings?.length]);
+
+  const processQueuedOrders = async () => {
+    if (!user || processingQueuedOrdersRef.current) return;
+    if (!isUsRegularMarketOpenEt()) return;
+    const currentPortfolio = portfolioRef.current;
+    const queuedOrders = Array.isArray(currentPortfolio?.queuedOrders) ? currentPortfolio.queuedOrders : [];
+    if (!queuedOrders.length) return;
+
+    processingQueuedOrdersRef.current = true;
+    try {
+      const sortedOrders = [...queuedOrders].sort((a, b) => {
+        const aTs = new Date(a?.placedAt || 0).getTime() || 0;
+        const bTs = new Date(b?.placedAt || 0).getTime() || 0;
+        return aTs - bTs;
+      });
+
+      const priceCache = {};
+      const nextPortfolio = {
+        ...currentPortfolio,
+        holdings: (currentPortfolio.holdings || []).map((holding) => ({ ...holding })),
+        queuedOrders: [],
+      };
+
+      for (const order of sortedOrders) {
+        const symbol = String(order?.symbol || '').toUpperCase();
+        const side = order?.side;
+        const shares = Number(order?.shares);
+        if (!symbol || !['buy', 'sell'].includes(side) || !Number.isFinite(shares) || shares <= 0) {
+          continue;
+        }
+
+        if (typeof priceCache[symbol] !== 'number') {
+          try {
+            const stock = await stockAPI.getStockDetails(symbol);
+            priceCache[symbol] = Number(stock?.price);
+          } catch (error) {
+            priceCache[symbol] = NaN;
+          }
+        }
+        const executionPrice = Number(priceCache[symbol]);
+        if (!Number.isFinite(executionPrice) || executionPrice <= 0) {
+          continue;
+        }
+
+        if (side === 'buy') {
+          const totalCost = shares * executionPrice;
+          if ((nextPortfolio.cash || 0) < totalCost) {
+            continue;
+          }
+          const existingHolding = nextPortfolio.holdings.find((h) => h.symbol === symbol);
+          if (existingHolding) {
+            const newShares = existingHolding.shares + shares;
+            existingHolding.avgPrice =
+              ((existingHolding.shares * existingHolding.avgPrice) + totalCost) / newShares;
+            existingHolding.shares = newShares;
+          } else {
+            nextPortfolio.holdings.push({
+              symbol,
+              shares,
+              avgPrice: executionPrice,
+              purchaseDate: new Date().toISOString(),
+            });
+          }
+          nextPortfolio.cash = (nextPortfolio.cash || 0) - totalCost;
+        } else {
+          const holdingIndex = nextPortfolio.holdings.findIndex((h) => h.symbol === symbol);
+          if (holdingIndex === -1) {
+            continue;
+          }
+          const holding = nextPortfolio.holdings[holdingIndex];
+          if (holding.shares < shares) {
+            continue;
+          }
+          if (holding.shares === shares) {
+            nextPortfolio.holdings.splice(holdingIndex, 1);
+          } else {
+            nextPortfolio.holdings[holdingIndex] = {
+              ...holding,
+              shares: holding.shares - shares,
+            };
+          }
+          nextPortfolio.cash = (nextPortfolio.cash || 0) + (shares * executionPrice);
+        }
+      }
+
+      await refreshPortfolioValuation(nextPortfolio);
+    } catch (error) {
+      console.error('Error processing queued orders:', error);
+    } finally {
+      processingQueuedOrdersRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return undefined;
+    processQueuedOrders();
+    const intervalId = setInterval(() => {
+      processQueuedOrders();
+    }, QUEUE_PROCESS_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [user]);
+
+  const queueStockOrder = async (side, symbol, shares, requestedPrice = null) => {
+    if (!user) return { success: false, error: 'Not logged in' };
+    if (!['buy', 'sell'].includes(side)) return { success: false, error: 'Invalid order side' };
+    const parsedShares = Number(shares);
+    if (!Number.isFinite(parsedShares) || parsedShares <= 0) {
+      return { success: false, error: 'Invalid share quantity' };
+    }
+
+    const currentPortfolio = portfolioRef.current;
+    const nextPortfolio = {
+      ...currentPortfolio,
+      queuedOrders: [
+        ...(Array.isArray(currentPortfolio.queuedOrders) ? currentPortfolio.queuedOrders : []),
+        {
+          id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          side,
+          symbol: String(symbol || '').toUpperCase(),
+          shares: parsedShares,
+          requestedPrice: Number(requestedPrice) || null,
+          placedAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await persistPortfolio(nextPortfolio);
+    return { success: true };
+  };
 
   const buyStock = async (symbol, shares, price) => {
     if (!user) return { success: false, error: 'Not logged in' };
@@ -206,7 +470,7 @@ export const PortfolioProvider = ({ children }) => {
         totalValue: portfolio.totalValue,
       };
 
-      await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
+      await persistPortfolio(updatedPortfolio);
       await refreshPortfolioValuation(updatedPortfolio);
       
       return { success: true };
@@ -229,9 +493,7 @@ export const PortfolioProvider = ({ children }) => {
           holdings: updatedHoldings,
           totalValue: portfolio.totalValue,
         };
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
-        }
+        await persistPortfolio(updatedPortfolio);
         await refreshPortfolioValuation(updatedPortfolio);
         return { success: true, localOnly: true };
       } catch (fallbackError) {
@@ -266,7 +528,7 @@ export const PortfolioProvider = ({ children }) => {
         totalValue: portfolio.totalValue,
       };
 
-      await updateDoc(doc(db, 'portfolios', user.uid), updatedPortfolio);
+      await persistPortfolio(updatedPortfolio);
       await refreshPortfolioValuation(updatedPortfolio);
       
       return { success: true };
@@ -289,9 +551,7 @@ export const PortfolioProvider = ({ children }) => {
           holdings: updatedHoldings,
           totalValue: portfolio.totalValue,
         };
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(getPortfolioFallbackKey(user.uid), JSON.stringify(updatedPortfolio));
-        }
+        await persistPortfolio(updatedPortfolio);
         await refreshPortfolioValuation(updatedPortfolio);
         return { success: true, localOnly: true };
       } catch (fallbackError) {
@@ -316,6 +576,7 @@ export const PortfolioProvider = ({ children }) => {
     loading,
     buyStock,
     sellStock,
+    queueStockOrder,
     calculateTotalValue,
     refreshPortfolio: loadPortfolio,
     refreshPortfolioValuation,

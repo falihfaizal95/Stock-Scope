@@ -158,7 +158,7 @@ export default function StockDetailScreen() {
   const [selectedEarningsReport, setSelectedEarningsReport] = useState(null);
   const [hoveredChartIndex, setHoveredChartIndex] = useState(null);
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
-  const { portfolio, buyStock, sellStock } = usePortfolio();
+  const { portfolio, buyStock, sellStock, queueStockOrder } = usePortfolio();
   const theme = useTheme();
 
   const inWatchlist = isInWatchlist(symbol);
@@ -292,6 +292,11 @@ export default function StockDetailScreen() {
     }
 
     if (!canExecuteNow) {
+      const queueResult = await queueStockOrder(tradeAction, symbol, shares, stock.price);
+      if (!queueResult?.success) {
+        alert(queueResult?.error || 'Failed to queue order');
+        return;
+      }
       setTradeVisible(false);
       const eastern = getEasternDateParts();
       const queuedFor =
