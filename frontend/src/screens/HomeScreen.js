@@ -496,7 +496,10 @@ export default function HomeScreen() {
 
   const formatMoney = (value) => {
     const numeric = Number(value || 0);
-    return `$${numeric.toFixed(2)}`;
+    return `$${numeric.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   if (loading) {
@@ -547,7 +550,7 @@ export default function HomeScreen() {
                 Individual
               </Text>
               <Text style={[styles.portfolioPrimaryValue, { color: theme.colors.text }]}>
-                ${Number(portfolioDisplayPrice || portfolioDisplayTotal).toFixed(2)}
+                {formatMoney(Number(portfolioDisplayPrice || portfolioDisplayTotal))}
               </Text>
               <Text
                 style={[
@@ -555,7 +558,7 @@ export default function HomeScreen() {
                   { color: portfolioPositive ? theme.colors.positive : theme.colors.negative },
                 ]}
               >
-                {portfolioPositive ? '+' : '-'}${Math.abs(portfolioChange).toFixed(2)} (
+                {portfolioPositive ? '+' : '-'}{formatMoney(Math.abs(portfolioChange))} (
                 {portfolioPositive ? '+' : ''}
                 {portfolioChangePct.toFixed(2)}%) {changePeriodLabel}
               </Text>
@@ -770,7 +773,7 @@ export default function HomeScreen() {
               </Text>
             </View>
             <Text style={[styles.buyingPowerValue, { color: theme.colors.text }]}>
-              ${buyingPower.toFixed(2)}
+              {formatMoney(buyingPower)}
             </Text>
           </TouchableOpacity>
         </View>
