@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 import { stockAPI } from '../utils/api';
 
 const PortfolioContext = createContext({});
-const STARTING_CASH = 1000000;
+const STARTING_CASH = 100000;
 const getPortfolioFallbackKey = (uid) => `portfolio_fallback_${uid}`;
 const QUEUE_PROCESS_INTERVAL_MS = 15000;
 
@@ -132,7 +132,7 @@ export const usePortfolio = () => {
 export const PortfolioProvider = ({ children }) => {
   const { user } = useAuth();
   const [portfolio, setPortfolio] = useState({
-    cash: STARTING_CASH, // Starting fake money: $1,000,000
+    cash: STARTING_CASH, // Starting fake money: $100,000
     holdings: [],
     totalValue: STARTING_CASH,
     history: [],
@@ -168,10 +168,25 @@ export const PortfolioProvider = ({ children }) => {
           queuedOrders: [],
           ...portfolioDoc.data(),
         };
-        setPortfolio(loadedPortfolio);
-        await refreshPortfolioValuation(loadedPortfolio);
+        const shouldMigrateLegacyStartingCash =
+          Number(loadedPortfolio.cash) === 1000000 &&
+          Array.isArray(loadedPortfolio.holdings) &&
+          loadedPortfolio.holdings.length === 0;
+        const normalizedPortfolio = shouldMigrateLegacyStartingCash
+          ? {
+              ...loadedPortfolio,
+              cash: STARTING_CASH,
+              totalValue: STARTING_CASH,
+              history: [{ value: STARTING_CASH, timestamp: new Date().toISOString() }],
+            }
+          : loadedPortfolio;
+        setPortfolio(normalizedPortfolio);
+        if (shouldMigrateLegacyStartingCash) {
+          await setDoc(doc(db, 'portfolios', user.uid), normalizedPortfolio, { merge: true });
+        }
+        await refreshPortfolioValuation(normalizedPortfolio);
       } else {
-        // Initialize portfolio with $1,000,000 fake money
+        // Initialize portfolio with $100,000 fake money
         const initialPortfolio = {
           cash: STARTING_CASH,
           holdings: [],

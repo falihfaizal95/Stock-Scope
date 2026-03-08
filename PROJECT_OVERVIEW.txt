@@ -122,7 +122,7 @@ Watchlist
 Portfolio / paper trading
 - Firestore `portfolios` doc per user (when available)
 - Local fallback portfolio storage used if Firestore read/write fails
-- Starting paper trading cash: $1,000,000
+- Starting paper trading cash: $100,000
 - Holdings track symbol, shares, avgPrice, purchaseDate
 
 ═══════════════════════════════════════════════════════════════════
