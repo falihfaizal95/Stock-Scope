@@ -16,7 +16,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stockscope.app"
+      "bundleIdentifier": "com.stockscope.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "StockScope needs photo library access so you can set a profile picture.",
+        "NSPhotoLibraryAddUsageDescription": "StockScope can save your updated profile image when needed."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,5 +37,4 @@
     ]
   }
 }
-
 
