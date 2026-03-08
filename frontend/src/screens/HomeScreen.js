@@ -436,7 +436,7 @@ export default function HomeScreen() {
               styles.cardDivider,
               {
                 width: cardWidth,
-                borderTopColor: theme.colors.border,
+                borderTopColor: 'rgba(142, 142, 147, 0.55)',
               },
             ]}
           />
@@ -1036,12 +1036,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   cardDivider: {
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth + 0.5,
     borderStyle: 'dotted',
-    marginTop: -2,
-    marginBottom: 10,
+    marginTop: 2,
+    marginBottom: 14,
     alignSelf: 'flex-start',
-    opacity: 0.75,
+    opacity: 1,
   },
   stockCard: {
     padding: 12,
