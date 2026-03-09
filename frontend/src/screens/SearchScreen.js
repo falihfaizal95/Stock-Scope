@@ -12,6 +12,7 @@ import {
 import { Text, Searchbar, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { stockAPI } from '../utils/api';
 import { useTheme } from 'react-native-paper';
 
@@ -29,6 +30,7 @@ export default function SearchScreen() {
   const [brokenLogos, setBrokenLogos] = useState({});
   const navigation = useNavigation();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (searchQuery.trim().length === 0) {
@@ -328,7 +330,14 @@ export default function SearchScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.searchContainer}>
+      <View
+        style={[
+          styles.searchContainer,
+          {
+            paddingTop: Math.max(insets.top + 6, 16),
+          },
+        ]}
+      >
         <Searchbar
           placeholder="Search stocks (e.g., AAPL, Tesla)"
           onChangeText={setSearchQuery}

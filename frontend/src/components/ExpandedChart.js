@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -25,6 +25,7 @@ const TIMEFRAMES = [
 
 export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
   const [selectedTimeframe, setSelectedTimeframe] = useState('1d');
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const theme = useTheme();
 
   const generateChartData = (timeframe) => {
@@ -66,9 +67,56 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
     return data;
   };
 
-  const chartData = generateChartData(selectedTimeframe);
+  const chartData = useMemo(
+    () => generateChartData(selectedTimeframe),
+    [selectedTimeframe, stockData?.price, stockData?.changePercent, symbol]
+  );
+  const generateChartTimestamps = (timeframe, points) => {
+    const now = Date.now();
+    const intervals = {
+      '1d': 60 * 60 * 1000,
+      '1w': 6 * 60 * 60 * 1000,
+      '1m': 24 * 60 * 60 * 1000,
+      '3m': 3 * 24 * 60 * 60 * 1000,
+      '1y': 7 * 24 * 60 * 60 * 1000,
+      'all': 30 * 24 * 60 * 60 * 1000,
+    };
+    const step = intervals[timeframe] || intervals['1d'];
+    return Array.from({ length: points }, (_, i) => new Date(now - step * (points - 1 - i)));
+  };
+  const chartTimestamps = useMemo(
+    () => generateChartTimestamps(selectedTimeframe, chartData.length),
+    [selectedTimeframe, chartData.length]
+  );
+  const chartWidth = screenWidth - 32;
+  const chartHeight = screenHeight * 0.6;
+  const displayIndex = hoveredIndex ?? Math.max(chartData.length - 1, 0);
+  const displayPrice = chartData[displayIndex] ?? chartData[chartData.length - 1] ?? stockData?.price ?? 0;
+  const displayTime = chartTimestamps[displayIndex] ?? new Date();
+  const chartMin = Math.min(...chartData);
+  const chartMax = Math.max(...chartData);
+  const hoverX = chartData.length > 1 ? (displayIndex / (chartData.length - 1)) * chartWidth : 0;
+  const hoverY = chartMax === chartMin
+    ? chartHeight / 2
+    : chartHeight - ((displayPrice - chartMin) / (chartMax - chartMin)) * (chartHeight - 12);
   const chartColor = stockData?.changePercent >= 0 ? theme.colors.positive : theme.colors.negative;
   const labels = Array(chartData.length).fill('');
+  const formatHoverTime = (date, timeframe) => {
+    if (!date) return '';
+    if (timeframe === '1d') {
+      return date.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+    if (timeframe === '1w' || timeframe === '1m' || timeframe === '3m') {
+      return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const setHoverFromX = (x) => {
+    if (!chartData.length) return;
+    const clampedX = Math.max(0, Math.min(chartWidth, x));
+    const idx = Math.round((clampedX / chartWidth) * (chartData.length - 1));
+    setHoveredIndex(Math.max(0, Math.min(chartData.length - 1, idx)));
+  };
   const extraStats = [
     ['Current Price', stockData?.price != null ? `$${stockData.price.toFixed(2)}` : 'N/A'],
     ['Open', stockData?.open != null ? `$${stockData.open.toFixed(2)}` : 'N/A'],
@@ -104,7 +152,7 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
             {stockData && (
               <View style={styles.priceContainer}>
                 <Text style={[styles.price, { color: theme.colors.text }]}>
-                  ${stockData.price?.toFixed(2)}
+                  ${Number(displayPrice || 0).toFixed(2)}
                 </Text>
                 <View style={[
                   styles.changeBadge,
@@ -126,6 +174,9 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
                     {stockData.changePercent?.toFixed(2)}%
                   </Text>
                 </View>
+                <Text style={[styles.hoverTime, { color: theme.colors.placeholder }]}>
+                  {formatHoverTime(displayTime, selectedTimeframe)}
+                </Text>
               </View>
             )}
           </View>
@@ -186,8 +237,8 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
                   },
                 ],
               }}
-              width={screenWidth - 32}
-              height={screenHeight * 0.6}
+              width={chartWidth}
+              height={chartHeight}
               withDots={false}
               withShadow={true}
               withVerticalLines={true}
@@ -220,6 +271,34 @@ export default function ExpandedChart({ visible, onClose, symbol, stockData }) {
                 borderRadius: 16,
               }}
             />
+            <View
+              style={[styles.chartHoverLayer, { width: chartWidth, height: chartHeight }]}
+              onStartShouldSetResponder={() => true}
+              onResponderGrant={(event) => setHoverFromX(event.nativeEvent.locationX)}
+              onResponderMove={(event) => setHoverFromX(event.nativeEvent.locationX)}
+              onResponderRelease={() => {}}
+              onResponderTerminate={() => {}}
+            >
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.chartCrosshair,
+                  { left: Math.max(0, Math.min(chartWidth - 1, hoverX)) },
+                ]}
+              />
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.chartHoverDot,
+                  {
+                    left: Math.max(0, Math.min(chartWidth - 10, hoverX - 5)),
+                    top: Math.max(0, Math.min(chartHeight - 10, hoverY - 5)),
+                    borderColor: theme.colors.background,
+                    backgroundColor: chartColor,
+                  },
+                ]}
+              />
+            </View>
           </View>
 
           <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
@@ -301,6 +380,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: 12,
   },
+  hoverTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
   changeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -336,6 +420,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    position: 'relative',
+  },
+  chartHoverLayer: {
+    position: 'absolute',
+    left: 16,
+    top: 24,
+  },
+  chartCrosshair: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  chartHoverDot: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
   },
   statsCard: {
     borderRadius: 16,

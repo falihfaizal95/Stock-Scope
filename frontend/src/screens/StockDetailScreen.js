@@ -459,8 +459,6 @@ export default function StockDetailScreen() {
                 {stock.changePercent?.toFixed(2)}%
               </Text>
             </View>
-          </View>
-          <View style={styles.actionButtonsColumn}>
             <Button
               mode="contained"
               onPress={handleWatchlistToggle}
@@ -487,7 +485,7 @@ export default function StockDetailScreen() {
               textColor="#fff"
               icon="swap-horizontal"
               labelStyle={{ fontSize: 13, fontWeight: '700' }}
-            >
+              >
               Trade
             </Button>
           </View>
@@ -1050,9 +1048,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   stockHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   symbol: {
     fontSize: 14,
@@ -1095,17 +1092,15 @@ const styles = StyleSheet.create({
   watchlistButton: {
     borderRadius: 12,
     borderWidth: 1,
-    transition: 'background-color 220ms ease, transform 180ms ease, border-color 220ms ease',
+    marginTop: 14,
     marginBottom: 10,
-  },
-  actionButtonsColumn: {
-    width: 146,
-    alignItems: 'stretch',
+    alignSelf: 'stretch',
   },
   tradeButton: {
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(10,132,255,0.35)',
+    alignSelf: 'stretch',
   },
   card: {
     marginHorizontal: 16,
